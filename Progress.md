@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: offline recovery-ranking gains replicated at seed 1, but its closed-loop success/coverage gain did not; matched seed-2 training jobs 16199/16200 are queued/running serially
+- Overall status: corrected three-seed pilot is complete; recovery-rich data robustly improves offline dynamics/ranking and peak closed-loop progress, but not final success/coverage, so Gate B is not passed
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -89,11 +89,11 @@ Last updated: 2026-09-14
 
 - [x] Implement `StateWorldModel` using shared DINO-WM temporal/planning infrastructure.
 - [~] Train `D_S`, `D_SF`, `D_SFR`, `D_SF_balanced` and `D_SFR_balanced` models.
-- [~] Measure 1/5/10/20-step dynamics prediction.
-- [~] Measure counterfactual action ranking.
-- [~] Measure closed-loop recovery success, coverage, steps and action cost.
-- [ ] Run at least 3 pilot seeds.
-- [ ] Decide whether the recovery signal is strong enough to proceed to Experiment B.
+- [x] Measure 1/5/10/20-step dynamics prediction for the primary fixed-budget comparison across 3 pilot seeds.
+- [x] Measure counterfactual action ranking across 3 pilot seeds.
+- [x] Measure closed-loop recovery success, coverage, steps and action cost across 3 pilot seeds.
+- [x] Run at least 3 pilot seeds.
+- [x] Apply Gate B after the three-seed pilot: not passed; remain in Phase 2 and repair the planner/model interface before Experiment B.
 
 ### Phase 3 - Experiment B
 
@@ -121,6 +121,8 @@ Last updated: 2026-09-14
 - A single goal image can bias visual planning toward an irrelevant final agent pose; a goal set is planned instead.
 - Existing Hydra Submitit configs request H100 resources although the available cluster documentation primarily lists 4090/3090 nodes.
 - Long-horizon CEM can exploit state-model error: one seed produced predicted near-goal costs while real coverage stayed near the branch state. Formal closed-loop evaluation must use calibrated short-horizon feedback planning and report action/coverage traces.
+- Across three corrected seeds, recovery-rich models reach substantially higher peak coverage but often lose progress before the 35-step endpoint; success and final-coverage uncertainty still cross zero. Diagnose goal retention and replanning drift before changing the world-model claim.
+- The current 30-scenario test set was used during planner calibration and must be treated as pilot evidence, not a final untouched test. Tune further planner changes only on validation scenarios, lock the configuration, and use fresh simulator-generated confirmatory test pairs.
 
 ## Decision gates
 
@@ -140,6 +142,45 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-14 21:07 - Phase 2 corrected three-seed aggregate and Gate B decision
+
+- Phase/purpose: aggregate the fixed-budget comparison across both training initialization and matched test-scenario variation
+- Git commit: checkpoints `cd99a24`; crossed-bootstrap aggregator and tests `a4fd07d`
+- Command/config: seeds 0/1/2; 30 common scenarios per seed; 10,000 crossed bootstrap resamples that independently resample training seeds and scenario IDs
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; report at `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/three_seed_aggregate.json`
+- Seeds: training seeds 0, 1 and 2; bootstrap seed 0
+- SLURM job ID/node: source jobs `16191`-`16202`; aggregation was a short remote CPU run
+- Log/output path: aggregate JSON above; remote regression output in terminal
+- Status: completed
+- Key metrics/error: recovery ranking averaged 0.800 for `SF` versus 0.989 for `SFR`, paired delta +0.189 with crossed-bootstrap 95% CI [0.056, 0.367]. Twenty-step object-goal RMSE averaged 5.255 versus 2.589 px, with reductions positive for all three seeds. Closed-loop success averaged 0.022 versus 0.056 (2/90 versus 5/90), delta +0.033 [-0.067, 0.156]; final coverage averaged 0.388 versus 0.495, delta +0.107 [-0.054, 0.254]. Peak coverage improved by +0.234 [0.135, 0.340] and action cost fell by 5.44 [-9.41, -1.76]. Aggregator plus Phase 2 regression passed 10 tests remotely.
+- Decision/next action: Gate B is not passed because success and final-coverage intervals cross zero despite robust offline, peak-coverage and action-cost gains. Stay in Phase 2; diagnose loss of achieved coverage, develop planner changes only on validation scenarios, then lock them and evaluate on fresh confirmatory pairs.
+
+### 2026-09-14 21:02 - Phase 2 corrected seed-2 closed-loop comparison
+
+- Phase/purpose: complete the third matched closed-loop recovery comparison
+- Git commit: checkpoints `cd99a24`; evaluation/comparison code available at `a4fd07d`
+- Command/config: all 30 held-out post-perturbation snapshots; maximum 35 execution steps; calibrated short-horizon CEM with horizon 4, action repeat 4, 256 samples, top-k 32, 4 iterations, action cost 0.01, zero smoothness cost and staging weight 1.0
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; report at `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/seed_2_closed_loop_short_comparison.json`
+- Seeds: training seed 2; deterministic per-scenario planner seeds; paired bootstrap seeds 0-2
+- SLURM job ID/node: `16201` (46s) and `16202` (48s), both completed on 4090node1
+- Log/output path: `$DATASET_DIR/logs/p2-sf-cr-cl2-16201.out`, `$DATASET_DIR/logs/p2-sfr-cr-cl2-16202.out`, and the comparison JSON above
+- Status: completed
+- Key metrics/error: success was 1/30 for `SF` and 0/30 for `SFR`, paired delta -0.033 with 95% CI [-0.100, 0.000]. Final coverage improved by +0.142 but its interval [-0.009, 0.295] crossed zero; action cost fell by 4.31 with interval [-8.55, 0.01]. Both jobs exited 0.
+- Decision/next action: seed 2 does not pass the closed-loop half of Gate B; aggregate all three seeds with crossed resampling
+
+### 2026-09-14 20:58 - Phase 2 corrected seed-2 offline comparison
+
+- Phase/purpose: complete the third corrected fixed-budget offline comparison
+- Git commit: checkpoints `cd99a24`; comparison code available at `1c5debb`
+- Command/config: universal 30-scenario `S/F1/F2/R` test set; 10,000 paired bootstrap resamples
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; report at `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/seed_2_offline_comparison.json`
+- Seeds: training seed 2; bootstrap seeds 0-2
+- SLURM job ID/node: source training jobs `16199` and `16200`; comparison was a short remote CPU run
+- Log/output path: comparison JSON above
+- Status: completed
+- Key metrics/error: recovery top-1 ranking improved from 0.900 to 1.000, paired delta +0.100 with 95% CI [0.000, 0.200]; the margin delta was +0.060 [-0.026, 0.155]. Object-goal RMSE improved from 0.493 to 0.318 px at 1 step, 1.507 to 0.966 px at 5 steps, 3.332 to 1.577 px at 10 steps and 5.468 to 2.860 px at 20 steps.
+- Decision/next action: core task-state prediction again improves, while ranking uncertainty is weaker than seeds 0/1; complete the matched closed-loop evaluation
+
 ### 2026-09-14 20:36 - Phase 2 corrected fixed-budget seed-2 training submissions
 
 - Phase/purpose: complete the predeclared three-seed pilot and resolve the seed-sensitive closed-loop result
@@ -147,11 +188,11 @@ Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is 
 - Command/config: identical to corrected seeds 0 and 1: shared `D_SF` train-only normalization, one-unit scale floors, 1-step plus weighted 5-step rollout loss, 50 epochs, branch balancing and a 580,587-parameter model
 - Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; outputs under `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/`
 - Seeds: 2 for both `D_SF_balanced` and `D_SFR_balanced`
-- SLURM job ID/node: `16199` (`D_SF_balanced`) and `16200` (`D_SFR_balanced`); node assigned when each starts
+- SLURM job ID/node: `16199` (`D_SF_balanced`) and `16200` (`D_SFR_balanced`), both on 4090node1
 - Log/output path: `$DATASET_DIR/logs/p2-sf-cr2-16199.out` and `$DATASET_DIR/logs/p2-sfr-cr2-16200.out`
-- Status: queued/running serially
-- Key metrics/error: both submissions accepted
-- Decision/next action: run the same paired offline and short-horizon closed-loop evaluations, then aggregate across all three training seeds before deciding Gate B
+- Status: completed; both exited 0 (`16199` in 6m29s, `16200` in 6m16s)
+- Key metrics/error: both runs produced best/latest checkpoints and complete automatic offline evaluation reports
+- Decision/next action: paired offline and closed-loop comparisons completed; aggregate across all three training seeds before deciding Gate B
 
 ### 2026-09-14 20:35 - Phase 2 corrected seed-1 closed-loop comparison
 
