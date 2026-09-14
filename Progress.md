@@ -147,6 +147,19 @@ No training or data-generation job has been submitted yet. Phase 0 used short lo
 - Key metrics/error: 2 tests failed because the initial 105-pixel agent offset overlapped the 120-pixel T stem plus 15-pixel agent radius, imparting unintended torque; nominal final coverage was 0
 - Decision/next action: initialize at the geometry-derived 139-pixel contact-safe offset and rerun the micro-pilot
 
+### 2026-09-14 14:42 - Phase 1 micro-pilot validation attempt 2
+
+- Phase/purpose: Phase 1 oracle and six-scenario micro-pilot validation after contact-safe initialization
+- Git commit: `220fa63`
+- Command/config: `python -m pytest -q tests/test_pusht_phase1.py`
+- Dataset path/version: temporary pytest directory; no authoritative dataset write
+- Seeds: 11 and 1234
+- SLURM job ID/node: not applicable; remote login-node short test
+- Log/output path: terminal output and a 20-step diagnostic trace
+- Status: failed
+- Key metrics/error: fixed vertical nominal test passed at 99.2% final coverage; angled scenario failed because a numerical geometry-ray intersection selected the wrong staging surface near the goal
+- Decision/next action: use the controlled translation domain's known 120-pixel rear support distance instead of a numerically unstable ray intersection
+
 ### 2026-09-14 14:18 - Phase 0 deterministic validation
 
 - Phase/purpose: Phase 0 environment, normalization and planner-bound validation
