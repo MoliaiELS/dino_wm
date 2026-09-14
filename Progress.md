@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: Phase 2 state-model pipeline passed remote validation; fixed-budget seed-0 pilot jobs 16182/16183 are running serially under the cluster job limit
+- Overall status: Phase 2 seed-0 offline pilot is promising; closed-loop jobs 16184/16185 are running serially, and a common-normalization rerun is pending the two-job submission limit
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -139,6 +139,45 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-14 19:40 - Phase 2 common-normalization control
+
+- Phase/purpose: remove preprocessing as a confound from the primary fixed-budget comparison
+- Git commit: `1471ed7`
+- Command/config: both balanced variants will use statistics from their common `D_SF = S+F1` training subset; every oracle-state standard deviation has a one-unit physical floor so constant angle coordinates are not divided by numerical noise
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`
+- Seeds: planned seed 0 rerun first
+- SLURM job ID/node: none; submission was rejected by `AssocMaxSubmitJobLimit` while jobs 16184/16185 occupied the account's two submission slots
+- Log/output path: not applicable; remote Phase 2 regression output in terminal
+- Status: planned
+- Key metrics/error: updated normalization implementation passed all 5 Phase 2 tests remotely; no training job was created by the rejected submission
+- Decision/next action: submit the two common-normalization seed-0 runs after the closed-loop jobs release the account slots; treat the earlier variant-specific-normalization result as pilot evidence only
+
+### 2026-09-14 19:38 - Phase 2 seed-0 offline paired comparison
+
+- Phase/purpose: compare fixed-budget models on identical held-out pairs with paired bootstrap uncertainty
+- Git commit: model checkpoints `a98096d`; comparison code `6be0450`
+- Command/config: universal 30-scenario `S/F1/F2/R` test set; 10,000 paired bootstrap resamples
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; `$DATASET_DIR/phase2_runs/pilot_a98096d/`
+- Seeds: training seed 0; bootstrap seeds 0-2
+- SLURM job ID/node: training jobs 16182/16183; comparison was a short remote CPU run
+- Log/output path: `$DATASET_DIR/phase2_runs/pilot_a98096d/seed_0_offline_comparison.json`
+- Status: completed
+- Key metrics/error: recovery top-1 ranking improved from 0.633 to 1.000; paired delta +0.367, pair-bootstrap 95% CI [0.200, 0.533]; recovery-margin delta +0.243 [0.185, 0.306]; selection-regret reduction +0.174 [0.092, 0.259]; 20-step object-goal RMSE decreased from 6.20 to 2.09 px
+- Decision/next action: signal is promising but does not pass Gate B yet because this is one seed, uses variant-specific normalization, and lacks closed-loop comparison
+
+### 2026-09-14 19:39 - Phase 2 seed-0 closed-loop submissions
+
+- Phase/purpose: evaluate whether the offline ranking gain produces real receding-horizon recovery
+- Git commit: checkpoints `a98096d`; evaluation code `6be0450`
+- Command/config: all 30 held-out post-perturbation snapshots; maximum 35 steps; bounded CEM horizon 12, 256 samples, top-k 32, 4 iterations
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`
+- Seeds: training seed 0; deterministic per-scenario planner seeds
+- SLURM job ID/node: `16184` (`D_SF_balanced`, running on 4090node1) and `16185` (`D_SFR_balanced`, pending under `AssocMaxJobsLimit`)
+- Log/output path: `$DATASET_DIR/logs/p2-sf-cl0-16184.out` and `$DATASET_DIR/logs/p2-sfr-cl0-16185.out`; result files named `closed_loop.json` in each run directory
+- Status: running
+- Key metrics/error: no runtime errors at submission/initialization; full evaluation produces output only when all scenarios complete
+- Decision/next action: monitor both jobs, then make a paired closed-loop report
+
 ### 2026-09-14 19:32 - Phase 2 fixed-budget seed-0 pilot submission
 
 - Phase/purpose: first full-data equal-capacity comparison of neutral-failure versus recovery-rich dynamics
@@ -146,11 +185,11 @@ Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is 
 - Command/config: 50 epochs, batch 128, 580,587-parameter state model, branch-balanced sampling; `D_SF_balanced` and `D_SFR_balanced`
 - Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; outputs under `$DATASET_DIR/phase2_runs/pilot_a98096d/`
 - Seeds: 0 for both conditions
-- SLURM job ID/node: `16182` (`D_SF_balanced`, running on 4090node1) and `16183` (`D_SFR_balanced`, pending because of `AssocMaxJobsLimit`)
+- SLURM job ID/node: `16182` and `16183`, both ran serially on 4090node1 because of `AssocMaxJobsLimit`
 - Log/output path: `$DATASET_DIR/logs/p2-sf-b0-16182.out` and `$DATASET_DIR/logs/p2-sfr-b0-16183.out`
-- Status: running
-- Key metrics/error: storage checked before submission (9.5 TB available); job 16182 reached epoch 6 with validation loss decreasing from 0.0181 to 0.00627 at the first status check
-- Decision/next action: allow the one-job association limit to serialize the runs; inspect unified-test prediction/ranking before scheduling more seeds
+- Status: completed
+- Key metrics/error: storage had 9.5 TB available; best valid losses were 0.00179 (`D_SF_balanced`) and 0.00846 (`D_SFR_balanced`); both checkpoints and unified-test reports completed successfully
+- Decision/next action: paired comparison showed a promising recovery signal; rerun the primary comparison with shared train-only normalization before adding seeds
 
 ### 2026-09-14 19:30 - Phase 2 closed-loop interface smoke
 
