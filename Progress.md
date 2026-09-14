@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: corrected three-seed pilot is complete; recovery-rich data robustly improves offline dynamics/ranking and peak closed-loop progress, but not final success/coverage, so Gate B is not passed
+- Overall status: corrected three-seed pilot and Chinese experiment report are complete; recovery-rich data robustly improves offline dynamics/ranking and peak closed-loop progress, but not final success/coverage, so Gate B is not passed
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -141,6 +141,19 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-14 21:36 - Phase 1/2 Chinese experiment report and figures
+
+- Phase/purpose: consolidate the paired dataset, corrected fixed-budget configurations, metric definitions, three-seed results, validity limits and Gate B decision into a self-contained report
+- Git commit: figure generator `cdf1ab6`; report commit pending in this entry
+- Command/config: generated five static scientific figures from the authoritative Phase 1 dataset and corrected Phase 2 JSON reports; representative branch montage uses `scenario_000000`
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1` and `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/`
+- Seeds: data seed 20260914; training seeds 0, 1 and 2
+- SLURM job ID/node: not applicable; short remote CPU rendering run
+- Log/output path: `Experiment_Report_Phase2.md`, `report_assets/*.png`, and `scripts/generate_phase2_report_assets.py`
+- Status: completed
+- Key metrics/error: report directly embeds the branch montage, dataset audit, optimization curves, main comparisons and coverage-retention diagnostic; it defines every prediction, ranking, closed-loop and uncertainty metric and distinguishes all dataset/training/planner configurations
+- Decision/next action: use the report as the Phase 2 pilot record; keep Gate B closed and develop planner changes only on validation scenarios before a fresh confirmatory test
 
 ### 2026-09-14 21:07 - Phase 2 corrected three-seed aggregate and Gate B decision
 
