@@ -44,6 +44,8 @@ def parse_args():
     parser.add_argument("--cem-initial-std", type=float, default=0.5)
     parser.add_argument("--cem-action-cost", type=float, default=0.02)
     parser.add_argument("--cem-smoothness-cost", type=float, default=0.01)
+    parser.add_argument("--cem-staging-weight", type=float, default=0.25)
+    parser.add_argument("--cem-staging-distance", type=float, default=139.0)
     return parser.parse_args()
 
 
@@ -79,6 +81,8 @@ def main():
             "cem_initial_std": args.cem_initial_std,
             "cem_action_cost": args.cem_action_cost,
             "cem_smoothness_cost": args.cem_smoothness_cost,
+            "cem_staging_weight": args.cem_staging_weight,
+            "cem_staging_distance": args.cem_staging_distance,
         },
     }
     if not args.skip_prediction:
@@ -118,6 +122,8 @@ def main():
                 "initial_std": args.cem_initial_std,
                 "action_cost": args.cem_action_cost,
                 "smoothness_cost": args.cem_smoothness_cost,
+                "staging_weight": args.cem_staging_weight,
+                "staging_distance": args.cem_staging_distance,
             },
         )
     dump_json(args.output, results)

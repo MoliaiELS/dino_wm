@@ -30,6 +30,31 @@ def task_error(states):
     return position + angle
 
 
+def state_planning_cost(states, staging_weight=0.25, staging_distance=139.0):
+    """Task cost with shared geometric shaping for reaching a push support pose.
+
+    The oracle state already exposes agent-object and object-goal relative
+    positions in Experiment A.  This term only shapes the state objective; it
+    does not provide an oracle action or branch label to the planner.
+    """
+
+    cost = task_error(states)
+    if staging_weight <= 0:
+        return cost
+    if not isinstance(states, torch.Tensor):
+        raise TypeError("state_planning_cost expects a torch tensor")
+    object_goal = states[..., 2:4]
+    goal_distance = torch.linalg.vector_norm(object_goal, dim=-1)
+    direction = object_goal / torch.clamp(goal_distance[..., None], min=1e-6)
+    desired_agent_object = direction * float(staging_distance)
+    staging_error = torch.linalg.vector_norm(
+        states[..., 0:2] - desired_agent_object, dim=-1
+    ) / 100.0
+    # Remove staging pressure as the object reaches its goal.
+    staging_gate = torch.clamp(goal_distance / 50.0, 0.0, 1.0)
+    return cost + float(staging_weight) * staging_gate * staging_error
+
+
 def _denormalize_tensor(states, stats: NormalizationStats):
     mean = torch.as_tensor(stats.state_mean, dtype=states.dtype, device=states.device)
     std = torch.as_tensor(stats.state_std, dtype=states.dtype, device=states.device)
@@ -193,6 +218,8 @@ class StateCEMPlanner:
         action_repeat=3,
         action_cost=0.02,
         smoothness_cost=0.01,
+        staging_weight=0.25,
+        staging_distance=139.0,
         seed=0,
     ):
         if not 1 < topk <= num_samples:
@@ -208,6 +235,8 @@ class StateCEMPlanner:
         self.action_repeat = int(action_repeat)
         self.action_cost = float(action_cost)
         self.smoothness_cost = float(smoothness_cost)
+        self.staging_weight = float(staging_weight)
+        self.staging_distance = float(staging_distance)
         if self.action_repeat < 1:
             raise ValueError("action_repeat must be positive")
         self.control_horizon = int(math.ceil(self.horizon / self.action_repeat))
@@ -256,7 +285,11 @@ class StateCEMPlanner:
                 dim=(1, 2)
             )
             costs = (
-                task_error(final_raw)
+                state_planning_cost(
+                    final_raw,
+                    staging_weight=self.staging_weight,
+                    staging_distance=self.staging_distance,
+                )
                 + self.action_cost * effort
                 + self.smoothness_cost * smoothness
             )
@@ -313,14 +346,20 @@ def evaluate_closed_loop_recovery(
             )
             warm_start = None
             action_cost = 0.0
+            executed_actions = []
+            predicted_costs = []
             coverages = [float(env.evaluate_task()["coverage"])]
             success = bool(env.evaluate_task()["success"])
             steps = 0
             while steps < max_steps and not success:
-                sequence, _ = planner.plan(env.get_oracle_state(), warm_start)
+                sequence, predicted_cost = planner.plan(
+                    env.get_oracle_state(), warm_start
+                )
                 action = np.clip(sequence[0], -1.0, 1.0)
                 observation, _, _, _ = env.step(action)
                 action_cost += float(np.linalg.norm(action))
+                executed_actions.append(action.tolist())
+                predicted_costs.append(predicted_cost)
                 steps += 1
                 metrics = env.evaluate_task()
                 coverages.append(float(metrics["coverage"]))
@@ -339,6 +378,9 @@ def evaluate_closed_loop_recovery(
                     "final_coverage": coverages[-1],
                     "max_coverage": max(coverages),
                     "action_cost": action_cost,
+                    "actions": executed_actions,
+                    "coverage_trace": coverages,
+                    "predicted_cost_trace": predicted_costs,
                 }
             )
             if save_videos and output_dir is not None:

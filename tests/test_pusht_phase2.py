@@ -13,7 +13,12 @@ from phase2.data import (
     branch_balanced_weights,
     compute_train_normalization,
 )
-from phase2.evaluation import StateCEMPlanner, state_error_metrics, task_error
+from phase2.evaluation import (
+    StateCEMPlanner,
+    state_error_metrics,
+    state_planning_cost,
+    task_error,
+)
 
 
 BRANCHES = ("S", "F1", "F2", "R")
@@ -211,3 +216,13 @@ def test_state_cem_uses_bounded_low_frequency_action_blocks():
     np.testing.assert_allclose(actions[0], actions[1])
     np.testing.assert_allclose(actions[2], actions[3])
     assert np.isfinite(cost)
+
+
+def test_state_planning_cost_rewards_the_goal_aligned_staging_pose():
+    states = torch.zeros(2, 11)
+    states[:, 3] = 50.0
+    states[:, 5] = 1.0
+    states[0, 1] = 139.0
+    states[1, 0] = 139.0
+    costs = state_planning_cost(states, staging_weight=0.25)
+    assert costs[0] < costs[1]
