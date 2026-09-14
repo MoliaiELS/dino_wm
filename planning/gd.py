@@ -63,7 +63,7 @@ class GDPlanner(BasePlanner):
                 new_actions = self.preprocessor.normalize_actions(new_actions)
                 new_actions = rearrange(new_actions, "... f d -> ... (f d)")
             actions = torch.cat([actions, new_actions.to(device)], dim=1)
-        return actions
+        return self.preprocessor.clamp_normalized_actions(actions)
 
     def get_action_optimizer(self, actions):
         return torch.optim.SGD([actions], lr=self.lr)
@@ -103,6 +103,7 @@ class GDPlanner(BasePlanner):
                 actions_new += (
                     torch.randn_like(actions_new) * self.action_noise
                 )  # Add Gaussian noise
+                actions_new = self.preprocessor.clamp_normalized_actions(actions_new)
                 actions.copy_(actions_new)
 
             self.wandb_run.log(

@@ -1,4 +1,5 @@
-# env import
+import copy
+
 import gym
 import einops
 from gym import spaces
@@ -15,6 +16,13 @@ import pymunk.pygame_util
 import collections
 from matplotlib import cm
 import torch
+
+from .action_utils import (
+    DEFAULT_ACTION_SCALE,
+    DEFAULT_RELATIVE_ACTION_LIMIT,
+    clip_action,
+    get_action_bounds,
+)
 
 # @markdown ### **Environment**
 # @markdown Defines a PyMunk-based Push-T environment `PushTEnv`.
@@ -364,6 +372,7 @@ def pymunk_to_shapely(body, shapes):
 class PushTEnv(gym.Env):
     metadata = {"render.modes": ["human", "rgb_array"], "video.frames_per_second": 10}
     reward_range = (0.0, 1.0)
+    snapshot_version = 1
 
     def __init__(
         self,
@@ -374,7 +383,8 @@ class PushTEnv(gym.Env):
         render_size=224,
         reset_to_state=None,
         relative=True,
-        action_scale=100,
+        action_scale=DEFAULT_ACTION_SCALE,
+        relative_action_limit=DEFAULT_RELATIVE_ACTION_LIMIT,
         with_velocity=False,
         with_target=True,
         shape="T",  # shape can be "T" <- the original shape, "I", "L", "Z", "square" and "small_tee"
@@ -393,7 +403,8 @@ class PushTEnv(gym.Env):
         # legcay set_state for data compatibility
         self.legacy = legacy
         self.relative = relative  # relative action space
-        self.action_scale = action_scale
+        self.action_scale = float(action_scale)
+        self.relative_action_limit = float(relative_action_limit)
 
         # agent_pos, block_pos, block_angle
         self.observation_space = spaces.Box(
@@ -403,10 +414,17 @@ class PushTEnv(gym.Env):
             dtype=np.float64,
         )
 
-        # positional goal for agent
+        # Command-space actions. Relative commands are displacements which are
+        # multiplied by action_scale. Absolute commands are scaled positions.
+        action_low, action_high = get_action_bounds(
+            relative=self.relative,
+            action_scale=self.action_scale,
+            workspace_size=ws,
+            relative_action_limit=self.relative_action_limit,
+        )
         self.action_space = spaces.Box(
-            low=np.array([0, 0], dtype=np.float64),
-            high=np.array([ws, ws], dtype=np.float64),
+            low=action_low,
+            high=action_high,
             shape=(2,),
             dtype=np.float64,
         )
@@ -472,23 +490,17 @@ class PushTEnv(gym.Env):
         self._set_state(state)
 
         self.coverage_arr = []
-        state = self._get_obs()
-        visual = self._render_frame("rgb_array")
-        proprio = state[:2]
-        if self.with_velocity:
-            proprio = np.concatenate((proprio, state[5:]))
-        observation = {
-            "visual": visual,
-            "proprio": proprio
-        }
-        return observation, state
+        return self._get_observation()
 
     def step(self, action):
         dt = 1.0 / self.sim_hz
         self.n_contact_points = 0
         n_steps = self.sim_hz // self.control_hz
         if action is not None:
-            action = np.array(action) * self.action_scale
+            command_action = clip_action(
+                action, self.action_space.low, self.action_space.high
+            )
+            action = command_action * self.action_scale
             if self.relative:
                 action = self.agent.position + action
             self.latest_action = action
@@ -503,34 +515,21 @@ class PushTEnv(gym.Env):
                 # Step physics.
                 self.space.step(dt)
 
-        # compute reward
-        goal_body = self._get_goal_pose_body(self.goal_pose)
-        goal_geom = pymunk_to_shapely(goal_body, self.block.shapes)
-        block_geom = pymunk_to_shapely(self.block, self.block.shapes)
+        else:
+            command_action = None
 
-        intersection_area = goal_geom.intersection(block_geom).area
-        goal_area = goal_geom.area
-        coverage = intersection_area / goal_area
+        task_metrics = self.evaluate_task()
+        coverage = task_metrics["coverage"]
         reward = np.clip(coverage / self.success_threshold, 0, 1)
         done = False  # coverage > self.success_threshold
 
         self.coverage_arr.append(coverage)
 
-        state = self._get_obs()
-        # visual = self._render_frame("rgb_array")
-        visual = self._render_frame("rgb_array")
-        proprio = state[:2]
-        if self.with_velocity:
-            proprio = np.concatenate((proprio, state[5:]))
-        observation = {
-            "visual": visual,
-            "proprio": proprio
-        }
-        # observation = (
-        #     einops.rearrange(observation, "H W C -> 1 C H W") / 255.0
-        # )  # VCHW, range [0, 1]
+        observation, state = self._get_observation()
         info = self._get_info()
         info["state"] = state
+        info["command_action"] = command_action
+        info["success"] = task_metrics["success"]
         info["max_coverage"] = max(self.coverage_arr)
         info["final_coverage"] = self.coverage_arr[-1]
 
@@ -538,6 +537,17 @@ class PushTEnv(gym.Env):
 
     def render(self, mode):
         return self._render_frame(mode)
+
+    def _get_observation(self):
+        state = self._get_obs()
+        proprio = state[:2]
+        if self.with_velocity:
+            proprio = np.concatenate((proprio, state[5:]))
+        observation = {
+            "visual": self._render_frame("rgb_array"),
+            "proprio": proprio,
+        }
+        return observation, state
 
     def teleop_agent(self):
         TeleopAgent = collections.namedtuple("TeleopAgent", ["act"])
@@ -569,6 +579,75 @@ class PushTEnv(gym.Env):
                 + (self.block.angle % (2 * np.pi),)
             ).astype(np.float32)
         return obs
+
+    def get_oracle_state(self):
+        """Return the goal-relative Markov state used by Experiment A."""
+        agent_position = np.asarray(self.agent.position, dtype=np.float64)
+        block_position = np.asarray(self.block.position, dtype=np.float64)
+        goal_position = np.asarray(self.goal_pose[:2], dtype=np.float64)
+        angle_error = self._wrapped_angle_error(self.block.angle, self.goal_pose[2])
+        return np.asarray(
+            [
+                *(agent_position - block_position),
+                *(block_position - goal_position),
+                np.sin(angle_error),
+                np.cos(angle_error),
+                *self.agent.velocity,
+                *self.block.velocity,
+                self.block.angular_velocity,
+            ],
+            dtype=np.float32,
+        )
+
+    @staticmethod
+    def _wrapped_angle_error(angle, goal_angle):
+        return (float(angle) - float(goal_angle) + np.pi) % (2 * np.pi) - np.pi
+
+    def get_coverage(self, block_pose=None, goal_pose=None):
+        """Compute geometric object-goal coverage for the current block shape."""
+        if self.space is None:
+            raise RuntimeError("PushT environment must be reset before evaluation")
+
+        goal_pose = self.goal_pose if goal_pose is None else np.asarray(goal_pose)
+        goal_body = self._get_goal_pose_body(goal_pose)
+        goal_geom = pymunk_to_shapely(goal_body, self.block.shapes)
+
+        if block_pose is None:
+            block_body = self.block
+        else:
+            block_body = self._get_goal_pose_body(np.asarray(block_pose))
+        block_geom = pymunk_to_shapely(block_body, self.block.shapes)
+
+        if goal_geom.area <= 0:
+            raise RuntimeError("PushT goal geometry has zero area")
+        coverage = goal_geom.intersection(block_geom).area / goal_geom.area
+        return float(np.clip(coverage, 0.0, 1.0))
+
+    def evaluate_task(self, block_pose=None, goal_pose=None):
+        """Evaluate PushT success independently of the agent's final pose."""
+        if block_pose is None:
+            block_pose = np.asarray(
+                [*self.block.position, self.block.angle], dtype=np.float64
+            )
+        else:
+            block_pose = np.asarray(block_pose, dtype=np.float64)
+        goal_pose = (
+            np.asarray(self.goal_pose, dtype=np.float64)
+            if goal_pose is None
+            else np.asarray(goal_pose, dtype=np.float64)
+        )
+        coverage = self.get_coverage(block_pose=block_pose, goal_pose=goal_pose)
+        return {
+            "success": bool(coverage >= self.success_threshold),
+            "coverage": coverage,
+            "position_error": float(np.linalg.norm(block_pose[:2] - goal_pose[:2])),
+            "angle_error": float(
+                abs(self._wrapped_angle_error(block_pose[2], goal_pose[2]))
+            ),
+        }
+
+    def check_success(self):
+        return self.evaluate_task()["success"]
 
     def _get_goal_pose_body(self, pose):
         mass = 1
@@ -659,6 +738,107 @@ class PushTEnv(gym.Env):
         self.np_random = np.random.default_rng(seed)
         self.random_state = np.random.RandomState(seed)
 
+    @staticmethod
+    def _snapshot_body(body):
+        return {
+            "position": np.asarray(tuple(body.position), dtype=np.float64),
+            "velocity": np.asarray(tuple(body.velocity), dtype=np.float64),
+            "angle": float(body.angle),
+            "angular_velocity": float(body.angular_velocity),
+            "force": np.asarray(tuple(body.force), dtype=np.float64),
+            "torque": float(body.torque),
+            "center_of_gravity": np.asarray(
+                tuple(body.center_of_gravity), dtype=np.float64
+            ),
+        }
+
+    @staticmethod
+    def _restore_body(body, state):
+        body.center_of_gravity = tuple(state["center_of_gravity"])
+        body.angle = float(state["angle"])
+        body.position = tuple(state["position"])
+        body.velocity = tuple(state["velocity"])
+        body.angular_velocity = float(state["angular_velocity"])
+        body.force = tuple(state["force"])
+        body.torque = float(state["torque"])
+        body.activate()
+
+    def get_sim_state(self):
+        """Capture a complete, branchable simulator snapshot.
+
+        The returned dictionary is intentionally pickle-friendly so Phase 1
+        can persist exact counterfactual branch points.
+        """
+        if self.space is None:
+            raise RuntimeError("PushT environment must be reset before snapshotting")
+        return {
+            "version": self.snapshot_version,
+            "shape": self.shape,
+            "with_velocity": self.with_velocity,
+            "relative": self.relative,
+            "action_scale": self.action_scale,
+            "relative_action_limit": self.relative_action_limit,
+            "goal_pose": np.asarray(self.goal_pose, dtype=np.float64).copy(),
+            "success_threshold": float(self.success_threshold),
+            "space_damping": float(self.space.damping),
+            "agent": self._snapshot_body(self.agent),
+            "block": self._snapshot_body(self.block),
+            "coverage_arr": np.asarray(self.coverage_arr, dtype=np.float64).copy(),
+            "latest_action": (
+                None
+                if self.latest_action is None
+                else np.asarray(tuple(self.latest_action), dtype=np.float64).copy()
+            ),
+            "n_contact_points": int(self.n_contact_points),
+            "seed": self._seed,
+            "random_state": copy.deepcopy(self.random_state.get_state()),
+            "np_random_state": copy.deepcopy(self.np_random.bit_generator.state),
+        }
+
+    def set_sim_state(self, snapshot):
+        """Restore a snapshot into a freshly rebuilt Pymunk space.
+
+        Rebuilding clears solver and contact caches. Repeated branches restored
+        from the same snapshot therefore start from the same physical state.
+        """
+        snapshot = copy.deepcopy(snapshot)
+        if snapshot.get("version") != self.snapshot_version:
+            raise ValueError(
+                f"Unsupported PushT snapshot version: {snapshot.get('version')}"
+            )
+        if bool(snapshot["with_velocity"]) != bool(self.with_velocity):
+            raise ValueError("Snapshot with_velocity setting does not match environment")
+        if bool(snapshot["relative"]) != bool(self.relative):
+            raise ValueError("Snapshot action convention does not match environment")
+        if not np.isclose(float(snapshot["action_scale"]), self.action_scale):
+            raise ValueError("Snapshot action_scale does not match environment")
+        if not np.isclose(
+            float(snapshot["relative_action_limit"]), self.relative_action_limit
+        ):
+            raise ValueError("Snapshot relative action limit does not match environment")
+
+        self.shape = snapshot["shape"]
+        self._setup()
+        self.space.damping = float(snapshot["space_damping"])
+        self.goal_pose = np.asarray(snapshot["goal_pose"], dtype=np.float64).copy()
+        self.success_threshold = float(snapshot["success_threshold"])
+        self._restore_body(self.agent, snapshot["agent"])
+        self._restore_body(self.block, snapshot["block"])
+        self.space.reindex_shapes_for_body(self.agent)
+        self.space.reindex_shapes_for_body(self.block)
+
+        self.coverage_arr = list(np.asarray(snapshot["coverage_arr"], dtype=float))
+        self.latest_action = (
+            None
+            if snapshot["latest_action"] is None
+            else np.asarray(snapshot["latest_action"], dtype=np.float64).copy()
+        )
+        self.n_contact_points = int(snapshot["n_contact_points"])
+        self._seed = snapshot["seed"]
+        self.random_state.set_state(snapshot["random_state"])
+        self.np_random.bit_generator.state = snapshot["np_random_state"]
+        return self._get_observation()
+
     def _handle_collision(self, arbiter, space, data):
         self.n_contact_points += len(arbiter.contact_point_set.points)
 
@@ -668,8 +848,8 @@ class PushTEnv(gym.Env):
         pos_agent = state[:2]
         pos_block = state[2:4]
         rot_block = state[4]
-        vel_block = tuple(state[5:]) if self.with_velocity else (0, 0)
-        self.agent.velocity = vel_block
+        agent_velocity = tuple(state[5:]) if self.with_velocity else (0, 0)
+        self.agent.velocity = agent_velocity
         self.agent.position = pos_agent
         # setting angle rotates with respect to center of mass
         # therefore will modify the geometric position

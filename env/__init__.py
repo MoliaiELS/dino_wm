@@ -1,5 +1,18 @@
+"""Lightweight Gym registrations for the environments used by DINO-WM.
+
+Keep this module free of simulator imports.  In particular, importing the
+PushT environment must not require MuJoCo, which is an optional dependency
+used by PointMaze only.
+"""
+
 from gym.envs.registration import register
-from .pointmaze import U_MAZE
+
+
+# Duplicated here deliberately so registering the lazy PointMaze entry point
+# does not import env.pointmaze (and therefore mujoco_py).
+U_MAZE_SPEC = "#####\\#GOO#\\###O#\\#OOO#\\#####"
+
+
 register(
     id="pusht",
     entry_point="env.pusht.pusht_wrapper:PushTWrapper",
@@ -11,7 +24,7 @@ register(
     entry_point='env.pointmaze:PointMazeWrapper',
     max_episode_steps=300,
     kwargs={
-        'maze_spec':U_MAZE,
+        'maze_spec': U_MAZE_SPEC,
         'reward_type':'sparse',
         'reset_target': False,
         'ref_min_score': 23.85,

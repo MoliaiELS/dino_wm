@@ -78,6 +78,7 @@ class CEMPlanner(BasePlanner):
 
         mu, sigma = self.init_mu_sigma(obs_0, actions)
         mu, sigma = mu.to(self.device), sigma.to(self.device)
+        mu = self.preprocessor.clamp_normalized_actions(mu)
         n_evals = mu.shape[0]
 
         for i in range(self.opt_steps):
@@ -103,6 +104,7 @@ class CEMPlanner(BasePlanner):
                     * sigma[traj]
                     + mu[traj]
                 )
+                action = self.preprocessor.clamp_normalized_actions(action)
                 action[0] = mu[traj]  # optional: make the first one mu itself
                 with torch.no_grad():
                     i_z_obses, i_zs = self.wm.rollout(
@@ -114,7 +116,9 @@ class CEMPlanner(BasePlanner):
                 topk_idx = torch.argsort(loss)[: self.topk]
                 topk_action = action[topk_idx]
                 losses.append(loss[topk_idx[0]].item())
-                mu[traj] = topk_action.mean(dim=0)
+                mu[traj] = self.preprocessor.clamp_normalized_actions(
+                    topk_action.mean(dim=0)
+                )
                 sigma[traj] = topk_action.std(dim=0)
 
             self.wandb_run.log(

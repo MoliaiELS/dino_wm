@@ -89,7 +89,9 @@ class MPCPlanner(BasePlanner):
                 obs_g=obs_g,
                 actions=memo_actions,
             )  # (b, t, act_dim)
-            taken_actions = actions.detach()[:, : self.n_taken_actions]
+            taken_actions = self.preprocessor.clamp_normalized_actions(
+                actions.detach()[:, : self.n_taken_actions]
+            )
             self._apply_success_mask(taken_actions)
             memo_actions = actions.detach()[:, self.n_taken_actions :]
             self.planned_actions.append(taken_actions)

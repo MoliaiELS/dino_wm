@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 0 - runtime and environment preparation
-- Overall status: Experiment design completed; implementation has not started
+- Overall status: Phase 0 implementation completed locally; remote verification pending
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -62,12 +62,12 @@ Last updated: 2026-09-14
 
 ### Phase 0 - Runtime and environment
 
-- [ ] Make PushT import independent of PointMaze/MuJoCo.
-- [ ] Define and test one explicit relative-action convention.
-- [ ] Add action clipping shared by generator, loader and planner.
-- [ ] Add complete simulator snapshot and restore support.
-- [ ] Add task-success evaluation based on object-goal coverage.
-- [ ] Recompute normalization statistics from each training split.
+- [x] Make PushT import independent of PointMaze/MuJoCo.
+- [x] Define one explicit relative-action convention: command `[-1, 1]^2`, scaled by 100 simulator pixels.
+- [x] Add action clipping shared by the simulator, dataset metadata and planners.
+- [x] Add complete simulator snapshot and restore support.
+- [x] Add task-success evaluation based on object-goal coverage.
+- [x] Recompute normalization statistics from valid frames in each training split and reuse them for validation.
 - [ ] Add remote deterministic replay tests.
 
 ### Phase 1 - Dataset generation pilot
@@ -157,6 +157,8 @@ Use the following template for every meaningful remote run:
 
 ### 2026-09-14
 
+- Implemented the Phase 0 PushT runtime, action, snapshot, task-evaluation and normalization changes.
+- Added deterministic remote tests and a directly runnable PushT visual smoke-test script; execution is pending the required Git push and remote pull.
 - Read the current Notion feasibility plan.
 - Audited the local DINO-WM dataset, model, planning and PushT environment code.
 - Inspected the remote repository, Conda bootstrap and available dataset layout.

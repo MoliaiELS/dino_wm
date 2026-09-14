@@ -56,19 +56,28 @@ class PushTWrapper(PushTEnv):
     
     def eval_state(self, goal_state, cur_state):
         """
-        Return True if the goal is reached
+        Evaluate object-goal coverage while ignoring the agent's final pose.
+
+        ``goal_state`` and ``cur_state`` follow the legacy state layout:
         [agent_x, agent_y, T_x, T_y, angle, agent_vx, agent_vy]
         """
-        # if position difference is < 20, and angle difference < np.pi/9, then success
-        pos_diff = np.linalg.norm(goal_state[:4] - cur_state[:4])
-        angle_diff = np.abs(goal_state[4] - cur_state[4])
-        angle_diff = np.minimum(angle_diff, 2 * np.pi - angle_diff)
-        success = pos_diff < 20 and angle_diff < np.pi / 9
-        state_dist = np.linalg.norm(goal_state - cur_state)
+        goal_state = np.asarray(goal_state)
+        cur_state = np.asarray(cur_state)
+        task_metrics = self.evaluate_task(
+            block_pose=cur_state[2:5],
+            goal_pose=goal_state[2:5],
+        )
         return {
-            'success': success,
-            'state_dist': state_dist,
+            "success": task_metrics["success"],
+            "coverage": task_metrics["coverage"],
+            "position_error": task_metrics["position_error"],
+            "angle_error": task_metrics["angle_error"],
         }
+
+    def eval_task_state(self, cur_state):
+        """Evaluate a legacy state against the environment's configured target."""
+        cur_state = np.asarray(cur_state)
+        return self.evaluate_task(block_pose=cur_state[2:5])
 
     def prepare(self, seed, init_state):
         """

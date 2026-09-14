@@ -149,6 +149,8 @@ class PlanWorkspace:
             proprio_mean=self.dset.proprio_mean,
             proprio_std=self.dset.proprio_std,
             transform=self.dset.transform,
+            action_low=getattr(self.dset, "action_low", None),
+            action_high=getattr(self.dset, "action_high", None),
         )
 
         if self.cfg_dict["goal_source"] == "file":
