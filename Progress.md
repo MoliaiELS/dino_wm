@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: Phase 2 seed-0 offline pilot is promising; closed-loop jobs 16184/16185 are running serially, and a common-normalization rerun is pending the two-job submission limit
+- Overall status: Phase 2 exposed long-rollout planner exploitation; corrected common-normalization + rollout-loss seed-0 jobs 16191/16192 are running serially
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -120,6 +120,7 @@ Last updated: 2026-09-14
 - Object displacement and rotation remain unvalidated OOD perturbations and require a rotation-capable oracle before use as recovery labels.
 - A single goal image can bias visual planning toward an irrelevant final agent pose; a goal set is planned instead.
 - Existing Hydra Submitit configs request H100 resources although the available cluster documentation primarily lists 4090/3090 nodes.
+- Long-horizon CEM can exploit state-model error: one seed produced predicted near-goal costs while real coverage stayed near the branch state. Formal closed-loop evaluation must use calibrated short-horizon feedback planning and report action/coverage traces.
 
 ## Decision gates
 
@@ -138,6 +139,45 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-14 19:57 - Phase 2 corrected fixed-budget seed-0 training
+
+- Phase/purpose: rerun the primary comparison without preprocessing confounds and with explicit autoregressive rollout supervision
+- Git commit: `cd99a24`
+- Command/config: `D_SF_balanced` and `D_SFR_balanced`; shared normalization from the common `D_SF` train subset; one-unit state scale floor; 1-step loss plus weighted 5-step rollout loss; otherwise identical 50-epoch, 580,587-parameter configuration
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; outputs under `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/`
+- Seeds: 0 for both conditions
+- SLURM job ID/node: `16191` (`D_SF_balanced`, running on 4090node1) and `16192` (`D_SFR_balanced`, pending under `AssocMaxJobsLimit`)
+- Log/output path: `$DATASET_DIR/logs/p2-sf-cr0-16191.out` and `$DATASET_DIR/logs/p2-sfr-cr0-16192.out`
+- Status: running
+- Key metrics/error: prerequisite remote regression passed 8 tests; a 64-window CPU smoke showed both 1-step and 5-step rollout losses decreasing without runtime errors
+- Decision/next action: inspect offline metrics, then use the same calibrated short-horizon planner on both corrected checkpoints before adding training seeds
+
+### 2026-09-14 19:48-19:54 - Phase 2 planner calibration series
+
+- Phase/purpose: diagnose and reduce model exploitation in closed-loop recovery planning
+- Git commit: checkpoints `a98096d`; planner code evolved through `4f764ba` and `5dfb388`
+- Command/config: five held-out scenarios per run; job 16186 used horizon 12/action-repeat 3; job 16187 used horizon 20/action-repeat 4; job 16188 added staging shaping to the long horizon; jobs 16189/16190 used horizon 4 as one constant action block with staging weight 1 for recovery-rich/control respectively
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; calibration JSON files under the two `$DATASET_DIR/phase2_runs/pilot_a98096d/.../seed_0/` directories
+- Seeds: training seed 0; deterministic planner seeds for the first five test scenarios
+- SLURM job ID/node: 16186, 16187, 16188, 16189 and 16190; all completed on 4090node1
+- Log/output path: `$DATASET_DIR/logs/p2-*-1618*.out` plus `closed_loop_*_calib5.json`
+- Status: completed
+- Key metrics/error: low-frequency search reduced recovery-model action cost from about 23 to 4.80 but had 0/5 success; horizon 20 reached mean final coverage 0.488 but 0/5; long-horizon staging shaping regressed to 0.369; short-horizon feedback reached 1/5 and final coverage 0.485 for recovery-rich versus 0/5 and 0.319 for control
+- Decision/next action: reject long-horizon shaping as the formal planner; retain short-horizon feedback as the current candidate and add rollout loss to training before retesting
+
+### 2026-09-14 19:43 - Phase 2 seed-0 full closed-loop comparison
+
+- Phase/purpose: test whether the strong offline ranking signal transfers to unconstrained receding-horizon CEM
+- Git commit: checkpoints `a98096d`; evaluation `6be0450`
+- Command/config: all 30 test snapshots; 35 steps; CEM horizon 12, 256 samples, top-k 32, 4 iterations
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; `$DATASET_DIR/phase2_runs/pilot_a98096d/`
+- Seeds: training seed 0 and deterministic per-scenario planner seeds
+- SLURM job ID/node: 16184 and 16185, both completed serially on 4090node1
+- Log/output path: `$DATASET_DIR/logs/p2-sf-cl0-16184.out`, `$DATASET_DIR/logs/p2-sfr-cl0-16185.out`, and `$DATASET_DIR/phase2_runs/pilot_a98096d/seed_0_closed_loop_comparison.json`
+- Status: completed
+- Key metrics/error: success 0/30 versus 1/30; final coverage 0.360 versus 0.402; paired coverage delta +0.0417 with 95% CI [-0.0489, 0.1342]; traces showed predicted near-zero goal cost despite unchanged real coverage
+- Decision/next action: Gate B not passed; constrain planner search and train with open-loop rollout loss before any multi-seed claim
 
 ### 2026-09-14 19:40 - Phase 2 common-normalization control
 
