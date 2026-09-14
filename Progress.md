@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: corrected seed-0 comparison provisionally passed Gate B on ranking and closed-loop recovery; matched seed-1 training jobs 16195/16196 are queued/running serially
+- Overall status: offline recovery-ranking gains replicated at seed 1, but its closed-loop success/coverage gain did not; matched seed-2 training jobs 16199/16200 are queued/running serially
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -140,6 +140,45 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-14 20:36 - Phase 2 corrected fixed-budget seed-2 training submissions
+
+- Phase/purpose: complete the predeclared three-seed pilot and resolve the seed-sensitive closed-loop result
+- Git commit: `cd99a24`
+- Command/config: identical to corrected seeds 0 and 1: shared `D_SF` train-only normalization, one-unit scale floors, 1-step plus weighted 5-step rollout loss, 50 epochs, branch balancing and a 580,587-parameter model
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; outputs under `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/`
+- Seeds: 2 for both `D_SF_balanced` and `D_SFR_balanced`
+- SLURM job ID/node: `16199` (`D_SF_balanced`) and `16200` (`D_SFR_balanced`); node assigned when each starts
+- Log/output path: `$DATASET_DIR/logs/p2-sf-cr2-16199.out` and `$DATASET_DIR/logs/p2-sfr-cr2-16200.out`
+- Status: queued/running serially
+- Key metrics/error: both submissions accepted
+- Decision/next action: run the same paired offline and short-horizon closed-loop evaluations, then aggregate across all three training seeds before deciding Gate B
+
+### 2026-09-14 20:35 - Phase 2 corrected seed-1 closed-loop comparison
+
+- Phase/purpose: test whether seed 1's replicated offline advantage transfers to real simulator recovery
+- Git commit: checkpoints `cd99a24`; evaluation/comparison code available at `46fb2c1`
+- Command/config: all 30 held-out post-perturbation snapshots; maximum 35 execution steps; calibrated short-horizon CEM with horizon 4, action repeat 4, 256 samples, top-k 32, 4 iterations, action cost 0.01, zero smoothness cost and staging weight 1.0
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; report at `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/seed_1_closed_loop_short_comparison.json`
+- Seeds: training seed 1; deterministic per-scenario planner seeds; paired bootstrap seeds 0-2
+- SLURM job ID/node: `16197` and `16198`, both completed on 4090node1 in 45s
+- Log/output path: `$DATASET_DIR/logs/p2-sf-cr-cl1-16197.out`, `$DATASET_DIR/logs/p2-sfr-cr-cl1-16198.out`, and the comparison JSON above
+- Status: completed
+- Key metrics/error: both variants succeeded on 1/30 scenarios; paired success delta 0.000 with 95% CI [-0.100, 0.100]. Mean final coverage was 0.428 for `SF` and 0.418 for `SFR`, delta -0.011 [-0.176, 0.150]. `SFR` had higher mean maximum coverage (0.717 versus 0.544) and lower action cost (23.04 versus 29.88), paired action-cost delta -6.84 [-12.38, -1.54]. A Shapely intersection warning occurred, but both jobs exited 0 and wrote complete reports.
+- Decision/next action: seed 1 does not pass the closed-loop half of Gate B; finish seed 2 and aggregate across training seeds before modifying the planner or model
+
+### 2026-09-14 20:32 - Phase 2 corrected seed-1 offline comparison
+
+- Phase/purpose: replicate the corrected fixed-budget offline recovery-data comparison under a new training initialization
+- Git commit: checkpoints `cd99a24`; comparison code available at `46fb2c1`
+- Command/config: universal 30-scenario `S/F1/F2/R` test set; 10,000 paired bootstrap resamples
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; report at `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/seed_1_offline_comparison.json`
+- Seeds: training seed 1; bootstrap seeds 0-2
+- SLURM job ID/node: source training jobs `16195` and `16196`; comparison was a short remote CPU run
+- Log/output path: comparison JSON above
+- Status: completed
+- Key metrics/error: recovery top-1 ranking improved from 0.833 to 1.000; paired delta +0.167 with 95% CI [0.033, 0.300]; margin delta +0.248 [0.178, 0.321]; selection-regret reduction +0.082 [0.019, 0.153]. Object-goal RMSE improved from 0.608 to 0.307 px at 1 step, 1.626 to 0.617 px at 5 steps, 3.057 to 1.173 px at 10 steps and 4.871 to 2.123 px at 20 steps.
+- Decision/next action: offline ranking and long-rollout task-state prediction gains replicate across seeds 0 and 1; evaluate closed-loop recovery before interpreting the result
+
 ### 2026-09-14 20:18 - Phase 2 corrected fixed-budget seed-1 training submissions
 
 - Phase/purpose: test whether the positive corrected seed-0 recovery signal replicates across training initialization
@@ -147,11 +186,11 @@ Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is 
 - Command/config: same shared `D_SF` train-only normalization, one-unit scale floors, 1-step plus weighted 5-step rollout loss, 50 epochs, branch balancing and 580,587-parameter model as seed 0
 - Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; outputs under `$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/`
 - Seeds: 1 for both `D_SF_balanced` and `D_SFR_balanced`
-- SLURM job ID/node: `16195` (`D_SF_balanced`) and `16196` (`D_SFR_balanced`); node assigned when each starts
+- SLURM job ID/node: `16195` (`D_SF_balanced`) and `16196` (`D_SFR_balanced`), both on 4090node1
 - Log/output path: `$DATASET_DIR/logs/p2-sf-cr1-16195.out` and `$DATASET_DIR/logs/p2-sfr-cr1-16196.out`
-- Status: queued/running serially
-- Key metrics/error: both submissions accepted
-- Decision/next action: after automatic offline evaluation, run the identical short-horizon closed-loop comparison; then repeat seed 2 to complete the three-seed pilot
+- Status: completed; both exited 0 (`16195` in 6m21s, `16196` in 6m09s)
+- Key metrics/error: both runs produced best/latest checkpoints and complete automatic offline evaluation reports
+- Decision/next action: offline comparison replicated the recovery-ranking gain; matched closed-loop evaluation completed before starting seed 2
 
 ### 2026-09-14 20:15 - Phase 2 corrected seed-0 closed-loop submissions
 
