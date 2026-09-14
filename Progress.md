@@ -4,8 +4,8 @@ Last updated: 2026-09-14
 
 ## Current status
 
-- Current phase: Phase 0 - runtime and environment preparation
-- Overall status: Phase 0 implementation completed locally; remote verification pending
+- Current phase: Phase 1 - dataset generation pilot
+- Overall status: Phase 0 completed and verified remotely; Phase 1 has not started
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -27,7 +27,7 @@ Last updated: 2026-09-14
 ### Local repository
 
 - Branch: `main`
-- Audited commit: `5b12dea6f6b9e43e0f7a13a67ed29cedb7544f04`
+- Phase 0 tested commit: `87f0d20`
 - Local project execution is prohibited by `AGENTS.md`.
 
 ### Remote repository and environment
@@ -35,9 +35,8 @@ Last updated: 2026-09-14
 - Remote repository matched local audited commit at the time of inspection.
 - Non-interactive SSH requires `source ~/miniforge3/etc/profile.d/conda.sh` before `source bash.sh`.
 - `bash.sh` activates the `dino_wm` environment and sets `DATASET_DIR`.
-- Importing the common `env` package currently loads PointMaze/MuJoCo even for PushT.
-- The MuJoCo import path exposed missing runtime dependencies/settings including dynamic-library paths and `patchelf`.
-- Preferred fix: decouple optional environment imports. Do not use sudo to patch the server.
+- Importing the common `env` package no longer loads PointMaze/MuJoCo for PushT.
+- PointMaze's optional MuJoCo path still needs its own runtime dependencies/settings if that environment is used later; no system configuration was changed.
 
 ### Existing datasets
 
@@ -56,7 +55,8 @@ Last updated: 2026-09-14
 - Existing state: 7 dimensions.
 - Action: 2 dimensions.
 - Repeating reset from the same current state produced maximum absolute difference `0.0`.
-- Existing state snapshots do not include all object velocities required for exact mid-contact branching.
+- Versioned simulator snapshots now include both bodies' position, velocity, angle, angular velocity, force, torque and center of gravity, plus task/control/RNG state.
+- Restoring the same mid-episode snapshot produced identical oracle state, legacy state, coverage and RGB trajectories.
 
 ## Milestones
 
@@ -68,7 +68,7 @@ Last updated: 2026-09-14
 - [x] Add complete simulator snapshot and restore support.
 - [x] Add task-success evaluation based on object-goal coverage.
 - [x] Recompute normalization statistics from valid frames in each training split and reuse them for validation.
-- [ ] Add remote deterministic replay tests.
+- [x] Add and pass remote deterministic replay tests.
 
 ### Phase 1 - Dataset generation pilot
 
@@ -111,8 +111,6 @@ Last updated: 2026-09-14
 
 ## Open risks and questions
 
-- The original PushT action-space declaration does not match the effective relative-action convention.
-- Current PushT normalization constants belong to the old dataset and cannot be reused blindly.
 - A finite-horizon recoverability dataset may be imbalanced because many open-tabletop states are eventually recoverable.
 - The oracle controller must be strong enough that recovery labels reflect state recoverability rather than planner failure.
 - A single goal image can bias visual planning toward an irrelevant final agent pose; a goal set is planned instead.
@@ -134,7 +132,33 @@ Make a representation claim only if the learned temporal representation improves
 
 ## Run log
 
-No training or data-generation job has been submitted yet.
+No training or data-generation job has been submitted yet. Phase 0 used short login-node CPU smoke tests only.
+
+### 2026-09-14 14:18 - Phase 0 deterministic validation
+
+- Phase/purpose: Phase 0 environment, normalization and planner-bound validation
+- Git commit: `87f0d20`
+- Command/config: `python -m pytest -q tests/test_pusht_phase0.py`
+- Dataset path/version: synthetic temporary fixtures; no authoritative dataset read
+- Seeds: simulator replay seed 7
+- SLURM job ID/node: not applicable; remote login-node smoke test
+- Log/output path: terminal output
+- Status: completed
+- Key metrics/error: 7 tests passed in 2.57 seconds; 4 dependency deprecation warnings; exact branch replay error was zero
+- Decision/next action: Phase 0 validity gate passed; proceed to Phase 1 pilot generator
+
+### 2026-09-14 14:19 - PushT visual smoke test
+
+- Phase/purpose: Phase 0 rendering and deterministic branch visualization
+- Git commit: `87f0d20`
+- Command/config: `python visualize_pusht_phase0.py --output-dir plan_outputs/phase0_pusht_smoke`
+- Dataset path/version: not applicable; simulation-generated frames
+- Seeds: 7
+- SLURM job ID/node: not applicable; remote login-node smoke test
+- Log/output path: `~/dino_wm/plan_outputs/phase0_pusht_smoke/`
+- Status: completed
+- Key metrics/error: 10 RGB frames at 224x224; oracle replay max error 0.0; RGB replay max error 0; final coverage 0.3055
+- Decision/next action: visual/runtime path is ready for Phase 1 data-generation work
 
 Use the following template for every meaningful remote run:
 
@@ -158,7 +182,8 @@ Use the following template for every meaningful remote run:
 ### 2026-09-14
 
 - Implemented the Phase 0 PushT runtime, action, snapshot, task-evaluation and normalization changes.
-- Added deterministic remote tests and a directly runnable PushT visual smoke-test script; execution is pending the required Git push and remote pull.
+- Passed all 7 Phase 0 remote tests at commit `87f0d20`.
+- Generated and verified the direct PushT visual smoke-test artifacts on the remote server.
 - Read the current Notion feasibility plan.
 - Audited the local DINO-WM dataset, model, planning and PushT environment code.
 - Inspected the remote repository, Conda bootstrap and available dataset layout.
