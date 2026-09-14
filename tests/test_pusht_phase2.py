@@ -13,7 +13,7 @@ from phase2.data import (
     branch_balanced_weights,
     compute_train_normalization,
 )
-from phase2.evaluation import state_error_metrics, task_error
+from phase2.evaluation import StateCEMPlanner, state_error_metrics, task_error
 
 
 BRANCHES = ("S", "F1", "F2", "R")
@@ -170,3 +170,44 @@ def test_paired_bootstrap_reports_the_paired_mean():
     assert result["mean"] == 0.5
     assert result["bootstrap_95_ci"][0] <= 0.5
     assert result["bootstrap_95_ci"][1] >= 0.5
+
+
+def test_state_cem_uses_bounded_low_frequency_action_blocks():
+    class DummyWorldModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.anchor = torch.nn.Parameter(torch.zeros(()))
+
+        def rollout(self, initial_states, actions):
+            states = initial_states[:, -1:].repeat(1, actions.shape[1], 1)
+            states = states.clone()
+            states[:, :, 2] += torch.cumsum(actions[:, :, 0], dim=1)
+            states[:, :, 3] += torch.cumsum(actions[:, :, 1], dim=1)
+            return states
+
+    stats = NormalizationStats(
+        state_mean=np.zeros(11, dtype=np.float32),
+        state_std=np.ones(11, dtype=np.float32),
+        count=1,
+        variant="test",
+    )
+    planner = StateCEMPlanner(
+        DummyWorldModel(),
+        stats,
+        "cpu",
+        horizon=5,
+        num_samples=16,
+        topk=4,
+        iterations=2,
+        action_repeat=2,
+        seed=7,
+    )
+    initial = np.zeros(11, dtype=np.float32)
+    initial[2:4] = 5.0
+    initial[5] = 1.0
+    actions, cost = planner.plan(initial)
+    assert actions.shape == (5, 2)
+    assert np.all(actions >= -1.0) and np.all(actions <= 1.0)
+    np.testing.assert_allclose(actions[0], actions[1])
+    np.testing.assert_allclose(actions[2], actions[3])
+    assert np.isfinite(cost)

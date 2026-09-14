@@ -15,6 +15,7 @@ set -euo pipefail
 variant="${1:?dataset variant is required}"
 seed="${2:?training seed is required}"
 run_group="${3:?run group is required}"
+extra_args=("${@:4}")
 
 source ~/miniforge3/etc/profile.d/conda.sh
 cd ~/dino_wm
@@ -27,4 +28,5 @@ python evaluate_state_wm.py \
   --output "$run_dir/closed_loop.json" \
   --skip-prediction \
   --skip-ranking \
-  --closed-loop
+  --closed-loop \
+  "${extra_args[@]}"

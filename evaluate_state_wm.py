@@ -40,6 +40,10 @@ def parse_args():
     parser.add_argument("--cem-samples", type=int, default=256)
     parser.add_argument("--cem-topk", type=int, default=32)
     parser.add_argument("--cem-iterations", type=int, default=4)
+    parser.add_argument("--cem-action-repeat", type=int, default=3)
+    parser.add_argument("--cem-initial-std", type=float, default=0.5)
+    parser.add_argument("--cem-action-cost", type=float, default=0.02)
+    parser.add_argument("--cem-smoothness-cost", type=float, default=0.01)
     return parser.parse_args()
 
 
@@ -62,6 +66,20 @@ def main():
         "training_seed": checkpoint["seed"],
         "training_epoch": checkpoint["epoch"],
         "git_commit": checkpoint["git_commit"],
+        "evaluation_config": {
+            "device": str(device),
+            "batch_size": args.batch_size,
+            "prediction_stride": args.prediction_stride,
+            "max_scenarios": args.max_scenarios,
+            "cem_horizon": args.cem_horizon,
+            "cem_samples": args.cem_samples,
+            "cem_topk": args.cem_topk,
+            "cem_iterations": args.cem_iterations,
+            "cem_action_repeat": args.cem_action_repeat,
+            "cem_initial_std": args.cem_initial_std,
+            "cem_action_cost": args.cem_action_cost,
+            "cem_smoothness_cost": args.cem_smoothness_cost,
+        },
     }
     if not args.skip_prediction:
         results["prediction"] = evaluate_prediction_horizons(
@@ -96,6 +114,10 @@ def main():
                 "num_samples": args.cem_samples,
                 "topk": args.cem_topk,
                 "iterations": args.cem_iterations,
+                "action_repeat": args.cem_action_repeat,
+                "initial_std": args.cem_initial_std,
+                "action_cost": args.cem_action_cost,
+                "smoothness_cost": args.cem_smoothness_cost,
             },
         )
     dump_json(args.output, results)

@@ -190,7 +190,9 @@ class StateCEMPlanner:
         topk=32,
         iterations=4,
         initial_std=0.5,
-        action_cost=0.01,
+        action_repeat=3,
+        action_cost=0.02,
+        smoothness_cost=0.01,
         seed=0,
     ):
         if not 1 < topk <= num_samples:
@@ -203,7 +205,12 @@ class StateCEMPlanner:
         self.topk = int(topk)
         self.iterations = int(iterations)
         self.initial_std = float(initial_std)
+        self.action_repeat = int(action_repeat)
         self.action_cost = float(action_cost)
+        self.smoothness_cost = float(smoothness_cost)
+        if self.action_repeat < 1:
+            raise ValueError("action_repeat must be positive")
+        self.control_horizon = int(math.ceil(self.horizon / self.action_repeat))
         generator_device = self.device.type if self.device.type == "cuda" else "cpu"
         self.generator = torch.Generator(device=generator_device).manual_seed(seed)
 
@@ -211,11 +218,17 @@ class StateCEMPlanner:
     def plan(self, raw_state, warm_start=None):
         self.model.eval()
         if warm_start is None:
-            mean = torch.zeros(self.horizon, 2, device=self.device)
+            mean = torch.zeros(self.control_horizon, 2, device=self.device)
         else:
-            mean = torch.as_tensor(warm_start, dtype=torch.float32, device=self.device).clone()
-            if mean.shape != (self.horizon, 2):
+            warm_start = torch.as_tensor(
+                warm_start, dtype=torch.float32, device=self.device
+            )
+            if warm_start.shape != (self.horizon, 2):
                 raise ValueError("warm_start has the wrong shape")
+            controls = []
+            for start in range(0, self.horizon, self.action_repeat):
+                controls.append(warm_start[start : start + self.action_repeat].mean(dim=0))
+            mean = torch.stack(controls)
         std = torch.full_like(mean, self.initial_std)
         normalized = self.stats.normalize(np.asarray(raw_state, dtype=np.float32)).astype(np.float32)
         initial = torch.from_numpy(normalized).to(self.device)[None, None]
@@ -223,23 +236,39 @@ class StateCEMPlanner:
         for _ in range(self.iterations):
             noise = torch.randn(
                 self.num_samples,
-                self.horizon,
+                self.control_horizon,
                 2,
                 device=self.device,
                 generator=self.generator,
             )
-            candidates = torch.clamp(mean[None] + std[None] * noise, -1.0, 1.0)
-            candidates[0] = torch.clamp(mean, -1.0, 1.0)
+            control_candidates = torch.clamp(
+                mean[None] + std[None] * noise, -1.0, 1.0
+            )
+            control_candidates[0] = torch.clamp(mean, -1.0, 1.0)
+            candidates = control_candidates.repeat_interleave(
+                self.action_repeat, dim=1
+            )[:, : self.horizon]
             states = initial.expand(self.num_samples, -1, -1)
             predicted = self.model.rollout(states, candidates)
             final_raw = _denormalize_tensor(predicted[:, -1], self.stats)
-            costs = task_error(final_raw) + self.action_cost * candidates.square().mean(dim=(1, 2))
+            effort = candidates.square().sum(dim=(1, 2))
+            smoothness = (candidates[:, 1:] - candidates[:, :-1]).square().sum(
+                dim=(1, 2)
+            )
+            costs = (
+                task_error(final_raw)
+                + self.action_cost * effort
+                + self.smoothness_cost * smoothness
+            )
             elite_costs, elite_indices = torch.topk(costs, self.topk, largest=False)
-            elite = candidates[elite_indices]
+            elite = control_candidates[elite_indices]
             mean = torch.clamp(elite.mean(dim=0), -1.0, 1.0)
             std = torch.clamp(elite.std(dim=0, unbiased=False), min=0.03, max=1.0)
             best_cost = float(elite_costs[0].item())
-        return mean.cpu().numpy(), best_cost
+        action_sequence = mean.repeat_interleave(self.action_repeat, dim=0)[
+            : self.horizon
+        ]
+        return action_sequence.cpu().numpy(), best_cost
 
 
 def evaluate_closed_loop_recovery(
