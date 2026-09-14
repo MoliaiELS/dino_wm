@@ -28,6 +28,8 @@ Last updated: 2026-09-14
 
 - Branch: `main`
 - Phase 0 tested commit: `87f0d20`
+- Phase 1 generated-data commit: `a976e2c`
+- Phase 1 final regression commit: `a87a976`
 - Local project execution is prohibited by `AGENTS.md`.
 
 ### Remote repository and environment
@@ -136,6 +138,19 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-14 15:04 - Phase 1 final regression with remote fixture
+
+- Phase/purpose: final Phase 0+1 regression after adding one real generated scenario to Git
+- Git commit: `a87a976`
+- Command/config: `python -m pytest -q tests/test_pusht_phase0.py tests/test_pusht_phase1.py`
+- Dataset path/version: Git fixture from `$DATASET_DIR/pusht_recovery_phase1_pilot_v1/scenarios/scenario_000000`
+- Seeds: Phase 0 seed 7; Phase 1 test seeds 11 and 1234; generated fixture seed 20260914
+- SLURM job ID/node: not applicable; remote login-node short test
+- Log/output path: terminal output
+- Status: completed
+- Key metrics/error: 10 tests passed in 11.38 seconds; only four dependency deprecation warnings
+- Decision/next action: Phase 1 is complete; begin Phase 2 state-world-model baselines using the audited split/window manifests
 
 ### 2026-09-14 14:57 - Phase 1 full 200-scenario pilot
 
