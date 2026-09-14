@@ -629,7 +629,7 @@ def _video_frame_count(path):
         reader.close()
 
 
-def _paired_statistics(values, bootstrap_samples, seed=0):
+def _paired_statistics(values, bootstrap_samples, seed=0, target_effect=None):
     values = np.asarray(values, dtype=np.float64)
     mean = float(values.mean())
     std = float(values.std(ddof=1)) if len(values) > 1 else 0.0
@@ -643,13 +643,24 @@ def _paired_statistics(values, bootstrap_samples, seed=0):
         estimated_n = None if abs(mean) < 1e-12 else 1
     else:
         estimated_n = int(math.ceil(((1.96 + 0.8416) * std / abs(mean)) ** 2))
-    return {
+    result = {
         "n": len(values),
         "mean": mean,
         "std": std,
         "bootstrap_95_ci": confidence_interval,
         "estimated_pairs_for_80_percent_power_at_observed_effect": estimated_n,
     }
+    if target_effect is not None:
+        if std == 0:
+            target_n = 1
+        else:
+            target_n = int(
+                math.ceil(((1.96 + 0.8416) * std / float(target_effect)) ** 2)
+            )
+        result[
+            f"estimated_pairs_for_80_percent_power_at_effect_{target_effect:.2f}"
+        ] = target_n
+    return result
 
 
 def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
@@ -660,6 +671,7 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
     scenario_metrics = []
     perturbation_types = Counter()
     severities = Counter()
+    perturbation_cells = Counter()
     split_counts = Counter()
     action_violations = 0
     temporal_violations = 0
@@ -686,6 +698,9 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
         split_counts[metadata["split"]] += 1
         perturbation_types[metadata["perturbation"]["type"]] += 1
         severities[metadata["perturbation"]["severity"]] += 1
+        perturbation_cells[
+            f"{metadata['perturbation']['type']}:{metadata['perturbation']['severity']}"
+        ] += 1
 
         records = {}
         for branch in BRANCHES:
@@ -761,6 +776,15 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
         errors.append("Perturbation type counts are not balanced")
     if max(severities.values(), default=0) - min(severities.values(), default=0) > 1:
         errors.append("Severity counts are not balanced")
+    expected_cells = {
+        f"{perturbation_type}:{severity}"
+        for perturbation_type in PERTURBATION_LEVELS
+        for severity in ("low", "medium", "high")
+    }
+    if set(perturbation_cells) != expected_cells:
+        errors.append("Not every perturbation type/severity cell is represented")
+    elif max(perturbation_cells.values()) - min(perturbation_cells.values()) > 1:
+        errors.append("Joint perturbation type/severity cells are not balanced")
 
     for variant, split_entries in manifest["window_indices"].items():
         for split, entry in split_entries.items():
@@ -791,16 +815,40 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
             [row["R_coverage"] - row["F1_coverage"] for row in scenario_metrics],
             bootstrap_samples,
             seed=int(manifest["config"]["seed"]),
+            target_effect=0.10,
         )
         success_effect = _paired_statistics(
             [float(row["R_success"]) - float(row["F1_success"]) for row in scenario_metrics],
             bootstrap_samples,
             seed=int(manifest["config"]["seed"]) + 1,
+            target_effect=0.15,
         )
         if rates["S"] < 0.95:
             errors.append(f"Nominal oracle success rate is too low: {rates['S']:.3f}")
         if coverage_effect["mean"] <= 0:
             warnings.append("Recovery did not improve mean final coverage over F1")
+
+    variant_label_counts = {}
+    for variant, branches in manifest["variants"].items():
+        success_count = sum(
+            int(row[f"{branch}_success"])
+            for row in scenario_metrics
+            for branch in branches
+        )
+        total_count = len(scenario_metrics) * len(branches)
+        variant_label_counts[variant] = {
+            "success": success_count,
+            "failure": total_count - success_count,
+            "total_trajectories": total_count,
+        }
+
+    observed_estimates = [
+        coverage_effect["estimated_pairs_for_80_percent_power_at_observed_effect"],
+        success_effect["estimated_pairs_for_80_percent_power_at_observed_effect"],
+    ]
+    observed_estimates = [value for value in observed_estimates if value is not None]
+    design_floor = len(expected_cells) * 30
+    recommended_scenarios = max(observed_estimates + [design_floor])
 
     audit = {
         "schema_version": SCHEMA_VERSION,
@@ -809,12 +857,22 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
         "split_counts": dict(split_counts),
         "perturbation_type_counts": dict(perturbation_types),
         "severity_counts": dict(severities),
+        "perturbation_type_severity_counts": dict(perturbation_cells),
+        "variant_final_label_counts": variant_label_counts,
         "branch_final_success_rates": rates,
         "branch_state_max_abs_error": branch_state_max_error,
         "action_bound_violations": action_violations,
         "temporal_alignment_violations": temporal_violations,
         "paired_recovery_minus_f1_final_coverage": coverage_effect,
         "paired_recovery_minus_f1_success": success_effect,
+        "sample_size_recommendation": {
+            "analysis_unit": "paired scenario",
+            "two_sided_alpha": 0.05,
+            "target_power": 0.80,
+            "design_floor_scenarios": design_floor,
+            "design_floor_reason": "at least 30 scenarios in each of six perturbation type/severity cells",
+            "recommended_total_scenarios": recommended_scenarios,
+        },
         "errors": errors,
         "warnings": warnings,
         "gate_a_pass": not errors,

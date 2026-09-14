@@ -199,6 +199,19 @@ No training or data-generation job has been submitted yet. Phase 0 used short lo
 - Key metrics/error: S/F1/F2/R success 1.0/0.0/0.0/0.5; recovery-minus-F1 coverage +0.307, bootstrap 95% CI [0.099, 0.505]; all object-lateral cases accumulated contact torque and failed
 - Decision/next action: constrain the feasibility pilot to agent-lateral and agent-retreat failures; reserve object displacement and rotation for OOD after validating a rotation-capable oracle
 
+### 2026-09-14 14:53 - Phase 1 constrained-domain calibration
+
+- Phase/purpose: validate the revised recoverable perturbation domain before the batch pilot
+- Git commit: `011d772`
+- Command/config: 12 scenarios, 96-pixel RGB, balanced agent-lateral/agent-retreat perturbations
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_micro_011d772`
+- Seeds: base seed 20260914; 12 deterministic scenario seeds
+- SLURM job ID/node: not applicable; 29-second remote calibration run
+- Log/output path: dataset `audit.json`
+- Status: completed
+- Key metrics/error: S/F1/F2/R success 1.0/0.0/0.0/1.0; recovery-minus-F1 final coverage +0.628, bootstrap 95% CI [0.601, 0.654]; branch error/action violations/alignment violations all 0
+- Decision/next action: calibration gate passed; add conservative stratification-based sample-size reporting, rerun regression tests, then submit the 200-scenario SLURM pilot
+
 ### 2026-09-14 14:18 - Phase 0 deterministic validation
 
 - Phase/purpose: Phase 0 environment, normalization and planner-bound validation

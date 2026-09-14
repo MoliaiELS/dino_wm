@@ -62,6 +62,9 @@ def test_micro_dataset_has_exact_pairs_splits_and_alignment(tmp_path):
         "agent_retreat": 3,
     }
     assert audit["severity_counts"] == {"low": 2, "medium": 2, "high": 2}
+    assert len(audit["perturbation_type_severity_counts"]) == 6
+    assert set(audit["variant_final_label_counts"]) == set(VARIANTS)
+    assert audit["sample_size_recommendation"]["design_floor_scenarios"] == 180
     assert set(manifest["scenario_splits"].values()) == {"train", "valid", "test"}
 
     for scenario_id, split in manifest["scenario_splits"].items():
