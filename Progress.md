@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: Phase 1 completed; 200-scenario pilot passed Gate A and is ready for Experiment A
+- Overall status: Phase 2 implementation started after the 200-scenario pilot passed Gate A
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -87,7 +87,7 @@ Last updated: 2026-09-14
 
 ### Phase 2 - Experiment A
 
-- [ ] Implement `StateWorldModel` using shared DINO-WM temporal/planning infrastructure.
+- [~] Implement `StateWorldModel` using shared DINO-WM temporal/planning infrastructure.
 - [ ] Train `D_S`, `D_SF`, `D_SFR`, `D_SF_balanced` and `D_SFR_balanced` models.
 - [ ] Measure 1/5/10/20-step dynamics prediction.
 - [ ] Measure counterfactual action ranking.
@@ -303,6 +303,10 @@ Use the following template for every meaningful remote run:
 
 ### 2026-09-14
 
+- Started Phase 2 with a leakage-safe paired-state loader, a state/action-token
+  `StateWorldModel` over the existing causal ViT predictor, multi-horizon and
+  counterfactual ranking evaluation, and bounded state-space CEM recovery
+  planning. Remote regression and smoke validation are pending.
 - Completed the 200-scenario Phase 1 pilot and all structural/statistical audits under SLURM job 16174.
 - Added one remotely generated pilot scenario plus the full audit/manifest as a small Git-tracked regression fixture; kept the complete dataset remote.
 - Implemented and remotely validated the Phase 1 paired PushT generator, dataset variants, post-split window indices, structural audit, bootstrap intervals and pilot sample-size estimator.

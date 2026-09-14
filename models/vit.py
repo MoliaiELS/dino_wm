@@ -55,7 +55,15 @@ class Attention(nn.Module):
             nn.Linear(inner_dim, dim),
             nn.Dropout(dropout)
         ) if project_out else nn.Identity()
-        self.bias = generate_mask_matrix(NUM_PATCHES, NUM_FRAMES).to('cuda')
+        # Keep the causal mask device agnostic.  The previous eager ``cuda``
+        # move made every ViT predictor impossible to construct on a CPU and
+        # also tied the mask to the default CUDA device.  Registering it as a
+        # buffer lets ``module.to(device)`` move it together with the model.
+        self.register_buffer(
+            "bias",
+            generate_mask_matrix(NUM_PATCHES, NUM_FRAMES),
+            persistent=False,
+        )
 
     def forward(self, x):
         (
