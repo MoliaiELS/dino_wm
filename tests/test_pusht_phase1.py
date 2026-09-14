@@ -1,6 +1,7 @@
 import json
 import os
 from dataclasses import replace
+from pathlib import Path
 
 os.environ.setdefault("SDL_VIDEODRIVER", "dummy")
 
@@ -15,6 +16,9 @@ from phase1.pusht_dataset import (
     rollout_from_snapshot,
 )
 from phase1.pusht_oracle import GeometricPushTOracle
+
+
+FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pusht_phase1_pilot_v1"
 
 
 def test_geometric_oracle_solves_controlled_nominal_translation():
@@ -91,3 +95,29 @@ def test_micro_dataset_has_exact_pairs_splits_and_alignment(tmp_path):
             assert len(windows) == index_metadata["count"]
             assert all(window["split"] == split for window in windows)
             assert all(window["branch"] in expected_branches for window in windows)
+
+
+def test_checked_in_remote_pilot_fixture_is_self_consistent():
+    with open(FIXTURE_DIR / "audit.json", encoding="utf-8") as file:
+        audit = json.load(file)
+    with open(FIXTURE_DIR / "manifest.json", encoding="utf-8") as file:
+        manifest = json.load(file)
+    scenario_dir = FIXTURE_DIR / "scenario_000000"
+    with open(scenario_dir / "metadata.json", encoding="utf-8") as file:
+        metadata = json.load(file)
+
+    assert audit["gate_a_pass"]
+    assert manifest["scenario_count"] == 200
+    assert manifest["git_commit"] == "a976e2c6f8cdee5c5470881f8703b7f68a642bc3"
+    assert metadata["scenario_id"] == "scenario_000000"
+
+    branch_initials = []
+    for branch in BRANCHES:
+        assert (scenario_dir / f"{branch}.mp4").is_file()
+        with np.load(scenario_dir / f"{branch}.npz") as record:
+            assert len(record["oracle_state"]) == len(record["actions"]) + 1
+            assert len(record["sim_state"]) == len(record["actions"]) + 1
+            if branch != "S":
+                branch_initials.append(record["sim_state"][0])
+    np.testing.assert_array_equal(branch_initials[0], branch_initials[1])
+    np.testing.assert_array_equal(branch_initials[0], branch_initials[2])

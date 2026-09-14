@@ -1,0 +1,99 @@
+{
+  "branch_progress": 0.35199636220932007,
+  "branch_state_sha256": "64c23896c91d38b9e403dc675edc156ddbda644811981635f511be8d03a6f0ed",
+  "branch_step_in_nominal": 2,
+  "branches": {
+    "F1": {
+      "action_cost": 1.3560341596603394,
+      "action_count": 35,
+      "contact_steps": 35,
+      "ever_success": false,
+      "final_coverage": 0.27993035316467285,
+      "final_success": false,
+      "first_success_step": null,
+      "initial_coverage": 0.27019545435905457,
+      "max_coverage": 0.27993035316467285,
+      "observation_count": 36,
+      "rgb_sha256_before_encoding": "90ceaab6d34a1fd1c5f3f17eb7d178691f0831ec9012db18eeb5592a74ffc591",
+      "timeout": true,
+      "video": "F1.mp4"
+    },
+    "F2": {
+      "action_cost": 0.0,
+      "action_count": 35,
+      "contact_steps": 0,
+      "ever_success": false,
+      "final_coverage": 0.27993035316467285,
+      "final_success": false,
+      "first_success_step": null,
+      "initial_coverage": 0.27019545435905457,
+      "max_coverage": 0.27993035316467285,
+      "observation_count": 36,
+      "rgb_sha256_before_encoding": "65c8ea84a6df7035ac09958224e39042581697484d06f70254a2310252a7a868",
+      "timeout": true,
+      "video": "F2.mp4"
+    },
+    "R": {
+      "action_cost": 3.289206027984619,
+      "action_count": 35,
+      "contact_steps": 12,
+      "ever_success": true,
+      "final_coverage": 0.9667758345603943,
+      "final_success": true,
+      "first_success_step": 19,
+      "initial_coverage": 0.27019545435905457,
+      "max_coverage": 0.9667758345603943,
+      "observation_count": 36,
+      "rgb_sha256_before_encoding": "fcf4f3655afee67e0597eb910a93e38395f5747ef5644a50eb7119182b83ceb0",
+      "timeout": false,
+      "video": "R.mp4"
+    },
+    "S": {
+      "action_cost": 2.4560341835021973,
+      "action_count": 50,
+      "contact_steps": 10,
+      "ever_success": true,
+      "final_coverage": 0.968196451663971,
+      "final_success": true,
+      "first_success_step": 9,
+      "initial_coverage": 0.10656525939702988,
+      "max_coverage": 0.968196451663971,
+      "observation_count": 51,
+      "rgb_sha256_before_encoding": "56c0a04a306440ff764a002dcbdbfd7143d58a3f26eee3f38a4f0bfd6b6c18b6",
+      "timeout": false,
+      "video": "S.mp4"
+    }
+  },
+  "goal_pose": [
+    253.06294354263622,
+    203.132610765755,
+    -0.11693266344731353
+  ],
+  "initial_state": [
+    280.6686913750699,
+    438.1380583858096,
+    264.4520658496181,
+    300.08726680326464,
+    -0.11693266344731353,
+    0.0,
+    0.0
+  ],
+  "pair_id": "pair_000000",
+  "perturbation": {
+    "magnitude": 30.00000000000001,
+    "preserves_velocity": true,
+    "requested_magnitude": 30.0,
+    "severity": "low",
+    "target": "agent",
+    "transition_is_exogenous": true,
+    "type": "agent_lateral",
+    "vector": [
+      29.79513487393058,
+      -3.4999911206010665
+    ]
+  },
+  "scenario_id": "scenario_000000",
+  "seed": 20260914,
+  "shape": "T",
+  "split": "test"
+}

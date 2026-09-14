@@ -1,0 +1,96 @@
+{
+  "action_bound_violations": 0,
+  "audited_at_utc": "2026-09-14T07:00:46.439630+00:00",
+  "branch_final_success_rates": {
+    "F1": 0.0,
+    "F2": 0.0,
+    "R": 1.0,
+    "S": 1.0
+  },
+  "branch_state_max_abs_error": 0.0,
+  "errors": [],
+  "gate_a_pass": true,
+  "paired_recovery_minus_f1_final_coverage": {
+    "bootstrap_95_ci": [
+      0.6286503269337118,
+      0.6414264609590173
+    ],
+    "estimated_pairs_for_80_percent_power_at_effect_0.10": 2,
+    "estimated_pairs_for_80_percent_power_at_observed_effect": 1,
+    "mean": 0.6350557126104832,
+    "n": 200,
+    "std": 0.04508223563522301
+  },
+  "paired_recovery_minus_f1_success": {
+    "bootstrap_95_ci": [
+      1.0,
+      1.0
+    ],
+    "estimated_pairs_for_80_percent_power_at_effect_0.15": 1,
+    "estimated_pairs_for_80_percent_power_at_observed_effect": 1,
+    "mean": 1.0,
+    "n": 200,
+    "std": 0.0
+  },
+  "perturbation_type_counts": {
+    "agent_lateral": 100,
+    "agent_retreat": 100
+  },
+  "perturbation_type_severity_counts": {
+    "agent_lateral:high": 33,
+    "agent_lateral:low": 34,
+    "agent_lateral:medium": 33,
+    "agent_retreat:high": 33,
+    "agent_retreat:low": 33,
+    "agent_retreat:medium": 34
+  },
+  "sample_size_recommendation": {
+    "analysis_unit": "paired scenario",
+    "design_floor_reason": "at least 30 scenarios in each of six perturbation type/severity cells",
+    "design_floor_scenarios": 180,
+    "recommended_total_scenarios": 180,
+    "target_power": 0.8,
+    "two_sided_alpha": 0.05
+  },
+  "scenario_count": 200,
+  "schema_version": "pusht-recovery-pairs-v1",
+  "severity_counts": {
+    "high": 66,
+    "low": 67,
+    "medium": 67
+  },
+  "split_counts": {
+    "test": 30,
+    "train": 140,
+    "valid": 30
+  },
+  "temporal_alignment_violations": 0,
+  "variant_final_label_counts": {
+    "D_S": {
+      "failure": 0,
+      "success": 200,
+      "total_trajectories": 200
+    },
+    "D_SF": {
+      "failure": 200,
+      "success": 200,
+      "total_trajectories": 400
+    },
+    "D_SFR": {
+      "failure": 200,
+      "success": 400,
+      "total_trajectories": 600
+    },
+    "D_SFR_balanced": {
+      "failure": 200,
+      "success": 400,
+      "total_trajectories": 600
+    },
+    "D_SF_balanced": {
+      "failure": 400,
+      "success": 200,
+      "total_trajectories": 600
+    }
+  },
+  "warnings": []
+}

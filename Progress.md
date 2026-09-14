@@ -4,8 +4,8 @@ Last updated: 2026-09-14
 
 ## Current status
 
-- Current phase: Phase 1 - dataset generation pilot
-- Overall status: Phase 1 implementation and calibration passed; 200-scenario pilot job 16174 is running
+- Current phase: Phase 2 - Experiment A
+- Overall status: Phase 1 completed; 200-scenario pilot passed Gate A and is ready for Experiment A
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -45,7 +45,9 @@ Last updated: 2026-09-14
   - states: `(2000, 100, 4)`
   - actions: `(2000, 100, 2)`
   - sequence lengths: 2000 trajectories, all length 100
-- PushT data is not currently present under `DATASET_DIR`.
+- PushT Phase 1 pilot exists at `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`.
+- Pilot size/content: 200 paired scenarios, 800 aligned MP4 branches, 21 MB total.
+- A single complete scenario plus full manifest/audit is tracked under `tests/fixtures/pusht_phase1_pilot_v1` for lightweight regression tests.
 
 ### PushT smoke probe
 
@@ -77,9 +79,9 @@ Last updated: 2026-09-14
 - [x] Implement exact `S/F1/F2/R` branching.
 - [x] Store scenario IDs, pair IDs, complete branch snapshots, aligned simulator state, RGB, actions and metadata.
 - [x] Split scenarios before window generation and keep every pair in one split.
-- [ ] Generate approximately 200 pilot paired scenarios.
-- [ ] Audit branch-state equality, temporal alignment and label balance.
-- [ ] Estimate final sample size from pilot variance.
+- [x] Generate 200 pilot paired scenarios.
+- [x] Audit branch-state equality, temporal alignment and perturbation-cell balance; Gate A passed.
+- [x] Estimate final sample size from pilot variance and impose a conservative six-cell design floor of 180 scenarios.
 
 ### Phase 2 - Experiment A
 
@@ -112,7 +114,8 @@ Last updated: 2026-09-14
 ## Open risks and questions
 
 - A finite-horizon recoverability dataset may be imbalanced because many open-tabletop states are eventually recoverable.
-- The oracle controller must be strong enough that recovery labels reflect state recoverability rather than planner failure.
+- The controlled pilot has perfect S/R versus F1/F2 separation; Experiment A must check that this does not make the learned comparison trivially saturated.
+- Object displacement and rotation remain unvalidated OOD perturbations and require a rotation-capable oracle before use as recovery labels.
 - A single goal image can bias visual planning toward an irrelevant final agent pose; a goal set is planned instead.
 - Existing Hydra Submitit configs request H100 resources although the available cluster documentation primarily lists 4090/3090 nodes.
 
@@ -143,9 +146,9 @@ Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is 
 - Seeds: base seed 20260914; deterministic per-scenario seeds
 - SLURM job ID/node: `16174`, `4090node3`, 4 CPUs, no GPU, 2-hour limit
 - Log/output path: `$DATASET_DIR/logs/phase1_pilot_16174.out`
-- Status: running
-- Key metrics/error: calibration and 9/9 Phase 0+1 regression tests passed before submission
-- Decision/next action: monitor through generation, full video/alignment audit and sample-size report; do not mark Phase 1 complete until the job exits successfully
+- Status: completed in 3 minutes 39 seconds with exit code 0
+- Key metrics/error: 200 scenarios and 800 videos (21 MB); train/valid/test 140/30/30; S/F1/F2/R success 1.0/0.0/0.0/1.0; recovery-minus-F1 coverage +0.635, bootstrap 95% CI [0.629, 0.641]; branch/action/alignment errors all 0
+- Decision/next action: Gate A passed; retain 200 scenarios because it exceeds the conservative 180-scenario stratification floor and proceed to Phase 2 Experiment A
 
 ### 2026-09-14 14:56 - Phase 1 pilot submission attempt
 
@@ -285,7 +288,9 @@ Use the following template for every meaningful remote run:
 
 ### 2026-09-14
 
-- Implemented the Phase 1 paired PushT generator, dataset variants, post-split window indices, structural audit, bootstrap intervals and pilot sample-size estimator; remote validation is pending.
+- Completed the 200-scenario Phase 1 pilot and all structural/statistical audits under SLURM job 16174.
+- Added one remotely generated pilot scenario plus the full audit/manifest as a small Git-tracked regression fixture; kept the complete dataset remote.
+- Implemented and remotely validated the Phase 1 paired PushT generator, dataset variants, post-split window indices, structural audit, bootstrap intervals and pilot sample-size estimator.
 - Scoped the pilot to goal-aligned translation with lateral perturbations; deferred rotation perturbations to OOD evaluation until a rotation-capable oracle is validated.
 - Implemented the Phase 0 PushT runtime, action, snapshot, task-evaluation and normalization changes.
 - Passed all 7 Phase 0 remote tests at commit `87f0d20`.

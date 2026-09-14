@@ -1,0 +1,482 @@
+{
+  "action_convention": {
+    "command_high": [
+      1.0,
+      1.0
+    ],
+    "command_low": [
+      -1.0,
+      -1.0
+    ],
+    "kind": "bounded_relative_agent_displacement",
+    "simulator_pixels_per_command_unit": 100.0
+  },
+  "audit_path": "audit.json",
+  "branch_semantics": {
+    "F1": "post-perturbation open-loop nominal continuation",
+    "F2": "post-perturbation equal-horizon neutral continuation",
+    "R": "post-perturbation closed-loop oracle replanning",
+    "S": "closed-loop oracle nominal success trajectory"
+  },
+  "config": {
+    "bootstrap_samples": 5000,
+    "branch_horizon": 35,
+    "fps": 10,
+    "goal_angle_range": [
+      -0.2,
+      0.2
+    ],
+    "goal_x_range": [
+      220.0,
+      292.0
+    ],
+    "goal_y_range": [
+      165.0,
+      215.0
+    ],
+    "initial_agent_offset": 139.0,
+    "initial_distance_range": [
+      70.0,
+      100.0
+    ],
+    "nominal_horizon": 50,
+    "num_scenarios": 200,
+    "oracle": {
+      "clearance_margin": 15.0,
+      "max_orbit_angle": 0.2,
+      "max_push_command": 0.55,
+      "max_staging_command": 0.85,
+      "min_push_command": 0.06,
+      "orbit_angle_tolerance": 0.12,
+      "push_gain": 0.75,
+      "rear_support_distance": 120.0,
+      "staging_margin": 4.0,
+      "staging_tolerance": 7.0,
+      "support_ray_length": 180.0,
+      "support_ray_resolution": 1.0
+    },
+    "render_size": 224,
+    "save_videos": true,
+    "seed": 20260914,
+    "split_ratios": {
+      "test": 0.15,
+      "train": 0.7,
+      "valid": 0.15
+    },
+    "target_branch_progress": 0.35,
+    "verify_videos": true,
+    "window_length": 21
+  },
+  "created_at_utc": "2026-09-14T07:00:03.312883+00:00",
+  "gate_a_pass": true,
+  "git_commit": "a976e2c6f8cdee5c5470881f8703b7f68a642bc3",
+  "oracle_scope": "goal-aligned translation pilot",
+  "perturbation_levels": {
+    "agent_lateral": {
+      "high": 80.0,
+      "low": 30.0,
+      "medium": 55.0
+    },
+    "agent_retreat": {
+      "high": 80.0,
+      "low": 30.0,
+      "medium": 55.0
+    }
+  },
+  "scenario_count": 200,
+  "scenario_splits": {
+    "scenario_000000": "test",
+    "scenario_000001": "test",
+    "scenario_000002": "train",
+    "scenario_000003": "valid",
+    "scenario_000004": "train",
+    "scenario_000005": "test",
+    "scenario_000006": "valid",
+    "scenario_000007": "train",
+    "scenario_000008": "valid",
+    "scenario_000009": "train",
+    "scenario_000010": "valid",
+    "scenario_000011": "train",
+    "scenario_000012": "test",
+    "scenario_000013": "test",
+    "scenario_000014": "valid",
+    "scenario_000015": "train",
+    "scenario_000016": "train",
+    "scenario_000017": "train",
+    "scenario_000018": "train",
+    "scenario_000019": "train",
+    "scenario_000020": "train",
+    "scenario_000021": "train",
+    "scenario_000022": "train",
+    "scenario_000023": "train",
+    "scenario_000024": "test",
+    "scenario_000025": "test",
+    "scenario_000026": "train",
+    "scenario_000027": "train",
+    "scenario_000028": "train",
+    "scenario_000029": "train",
+    "scenario_000030": "train",
+    "scenario_000031": "train",
+    "scenario_000032": "test",
+    "scenario_000033": "train",
+    "scenario_000034": "train",
+    "scenario_000035": "train",
+    "scenario_000036": "valid",
+    "scenario_000037": "train",
+    "scenario_000038": "train",
+    "scenario_000039": "train",
+    "scenario_000040": "train",
+    "scenario_000041": "train",
+    "scenario_000042": "train",
+    "scenario_000043": "train",
+    "scenario_000044": "train",
+    "scenario_000045": "train",
+    "scenario_000046": "valid",
+    "scenario_000047": "train",
+    "scenario_000048": "train",
+    "scenario_000049": "train",
+    "scenario_000050": "train",
+    "scenario_000051": "valid",
+    "scenario_000052": "valid",
+    "scenario_000053": "test",
+    "scenario_000054": "valid",
+    "scenario_000055": "test",
+    "scenario_000056": "valid",
+    "scenario_000057": "train",
+    "scenario_000058": "test",
+    "scenario_000059": "train",
+    "scenario_000060": "train",
+    "scenario_000061": "test",
+    "scenario_000062": "train",
+    "scenario_000063": "valid",
+    "scenario_000064": "train",
+    "scenario_000065": "train",
+    "scenario_000066": "train",
+    "scenario_000067": "valid",
+    "scenario_000068": "train",
+    "scenario_000069": "train",
+    "scenario_000070": "train",
+    "scenario_000071": "train",
+    "scenario_000072": "train",
+    "scenario_000073": "test",
+    "scenario_000074": "test",
+    "scenario_000075": "train",
+    "scenario_000076": "train",
+    "scenario_000077": "valid",
+    "scenario_000078": "train",
+    "scenario_000079": "test",
+    "scenario_000080": "train",
+    "scenario_000081": "train",
+    "scenario_000082": "train",
+    "scenario_000083": "test",
+    "scenario_000084": "train",
+    "scenario_000085": "train",
+    "scenario_000086": "valid",
+    "scenario_000087": "valid",
+    "scenario_000088": "test",
+    "scenario_000089": "train",
+    "scenario_000090": "train",
+    "scenario_000091": "train",
+    "scenario_000092": "test",
+    "scenario_000093": "valid",
+    "scenario_000094": "train",
+    "scenario_000095": "train",
+    "scenario_000096": "valid",
+    "scenario_000097": "train",
+    "scenario_000098": "valid",
+    "scenario_000099": "valid",
+    "scenario_000100": "train",
+    "scenario_000101": "valid",
+    "scenario_000102": "valid",
+    "scenario_000103": "train",
+    "scenario_000104": "train",
+    "scenario_000105": "train",
+    "scenario_000106": "train",
+    "scenario_000107": "test",
+    "scenario_000108": "train",
+    "scenario_000109": "test",
+    "scenario_000110": "train",
+    "scenario_000111": "train",
+    "scenario_000112": "train",
+    "scenario_000113": "train",
+    "scenario_000114": "valid",
+    "scenario_000115": "valid",
+    "scenario_000116": "train",
+    "scenario_000117": "train",
+    "scenario_000118": "train",
+    "scenario_000119": "train",
+    "scenario_000120": "train",
+    "scenario_000121": "train",
+    "scenario_000122": "train",
+    "scenario_000123": "train",
+    "scenario_000124": "train",
+    "scenario_000125": "train",
+    "scenario_000126": "train",
+    "scenario_000127": "train",
+    "scenario_000128": "train",
+    "scenario_000129": "train",
+    "scenario_000130": "train",
+    "scenario_000131": "train",
+    "scenario_000132": "test",
+    "scenario_000133": "train",
+    "scenario_000134": "train",
+    "scenario_000135": "train",
+    "scenario_000136": "valid",
+    "scenario_000137": "test",
+    "scenario_000138": "train",
+    "scenario_000139": "train",
+    "scenario_000140": "train",
+    "scenario_000141": "train",
+    "scenario_000142": "train",
+    "scenario_000143": "train",
+    "scenario_000144": "train",
+    "scenario_000145": "train",
+    "scenario_000146": "train",
+    "scenario_000147": "train",
+    "scenario_000148": "valid",
+    "scenario_000149": "train",
+    "scenario_000150": "train",
+    "scenario_000151": "train",
+    "scenario_000152": "train",
+    "scenario_000153": "train",
+    "scenario_000154": "train",
+    "scenario_000155": "train",
+    "scenario_000156": "test",
+    "scenario_000157": "train",
+    "scenario_000158": "test",
+    "scenario_000159": "test",
+    "scenario_000160": "train",
+    "scenario_000161": "train",
+    "scenario_000162": "train",
+    "scenario_000163": "train",
+    "scenario_000164": "train",
+    "scenario_000165": "test",
+    "scenario_000166": "train",
+    "scenario_000167": "train",
+    "scenario_000168": "train",
+    "scenario_000169": "train",
+    "scenario_000170": "valid",
+    "scenario_000171": "train",
+    "scenario_000172": "train",
+    "scenario_000173": "train",
+    "scenario_000174": "train",
+    "scenario_000175": "train",
+    "scenario_000176": "valid",
+    "scenario_000177": "test",
+    "scenario_000178": "train",
+    "scenario_000179": "train",
+    "scenario_000180": "valid",
+    "scenario_000181": "train",
+    "scenario_000182": "train",
+    "scenario_000183": "train",
+    "scenario_000184": "valid",
+    "scenario_000185": "train",
+    "scenario_000186": "train",
+    "scenario_000187": "train",
+    "scenario_000188": "train",
+    "scenario_000189": "train",
+    "scenario_000190": "train",
+    "scenario_000191": "test",
+    "scenario_000192": "train",
+    "scenario_000193": "test",
+    "scenario_000194": "train",
+    "scenario_000195": "test",
+    "scenario_000196": "train",
+    "scenario_000197": "train",
+    "scenario_000198": "train",
+    "scenario_000199": "train"
+  },
+  "schema_version": "pusht-recovery-pairs-v1",
+  "sim_state_fields": [
+    "agent.position.x",
+    "agent.position.y",
+    "agent.velocity.x",
+    "agent.velocity.y",
+    "agent.angle",
+    "agent.angular_velocity",
+    "agent.force.x",
+    "agent.force.y",
+    "agent.torque",
+    "agent.center_of_gravity.x",
+    "agent.center_of_gravity.y",
+    "block.position.x",
+    "block.position.y",
+    "block.velocity.x",
+    "block.velocity.y",
+    "block.angle",
+    "block.angular_velocity",
+    "block.force.x",
+    "block.force.y",
+    "block.torque",
+    "block.center_of_gravity.x",
+    "block.center_of_gravity.y",
+    "goal_pose.x",
+    "goal_pose.y",
+    "goal_pose.angle",
+    "space_damping",
+    "success_threshold"
+  ],
+  "split_by_scenario_before_windows": true,
+  "variants": {
+    "D_S": [
+      "S"
+    ],
+    "D_SF": [
+      "S",
+      "F1"
+    ],
+    "D_SFR": [
+      "S",
+      "F1",
+      "R"
+    ],
+    "D_SFR_balanced": [
+      "S",
+      "F1",
+      "R"
+    ],
+    "D_SF_balanced": [
+      "S",
+      "F1",
+      "F2"
+    ]
+  },
+  "window_indices": {
+    "D_S": {
+      "test": {
+        "branches": [
+          "S"
+        ],
+        "count": 930,
+        "path": "indices/D_S_test.jsonl"
+      },
+      "train": {
+        "branches": [
+          "S"
+        ],
+        "count": 4340,
+        "path": "indices/D_S_train.jsonl"
+      },
+      "valid": {
+        "branches": [
+          "S"
+        ],
+        "count": 930,
+        "path": "indices/D_S_valid.jsonl"
+      }
+    },
+    "D_SF": {
+      "test": {
+        "branches": [
+          "S",
+          "F1"
+        ],
+        "count": 1410,
+        "path": "indices/D_SF_test.jsonl"
+      },
+      "train": {
+        "branches": [
+          "S",
+          "F1"
+        ],
+        "count": 6580,
+        "path": "indices/D_SF_train.jsonl"
+      },
+      "valid": {
+        "branches": [
+          "S",
+          "F1"
+        ],
+        "count": 1410,
+        "path": "indices/D_SF_valid.jsonl"
+      }
+    },
+    "D_SFR": {
+      "test": {
+        "branches": [
+          "S",
+          "F1",
+          "R"
+        ],
+        "count": 1890,
+        "path": "indices/D_SFR_test.jsonl"
+      },
+      "train": {
+        "branches": [
+          "S",
+          "F1",
+          "R"
+        ],
+        "count": 8820,
+        "path": "indices/D_SFR_train.jsonl"
+      },
+      "valid": {
+        "branches": [
+          "S",
+          "F1",
+          "R"
+        ],
+        "count": 1890,
+        "path": "indices/D_SFR_valid.jsonl"
+      }
+    },
+    "D_SFR_balanced": {
+      "test": {
+        "branches": [
+          "S",
+          "F1",
+          "R"
+        ],
+        "count": 1890,
+        "path": "indices/D_SFR_balanced_test.jsonl"
+      },
+      "train": {
+        "branches": [
+          "S",
+          "F1",
+          "R"
+        ],
+        "count": 8820,
+        "path": "indices/D_SFR_balanced_train.jsonl"
+      },
+      "valid": {
+        "branches": [
+          "S",
+          "F1",
+          "R"
+        ],
+        "count": 1890,
+        "path": "indices/D_SFR_balanced_valid.jsonl"
+      }
+    },
+    "D_SF_balanced": {
+      "test": {
+        "branches": [
+          "S",
+          "F1",
+          "F2"
+        ],
+        "count": 1890,
+        "path": "indices/D_SF_balanced_test.jsonl"
+      },
+      "train": {
+        "branches": [
+          "S",
+          "F1",
+          "F2"
+        ],
+        "count": 8820,
+        "path": "indices/D_SF_balanced_train.jsonl"
+      },
+      "valid": {
+        "branches": [
+          "S",
+          "F1",
+          "F2"
+        ],
+        "count": 1890,
+        "path": "indices/D_SF_balanced_valid.jsonl"
+      }
+    }
+  }
+}
