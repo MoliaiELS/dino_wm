@@ -82,7 +82,9 @@ class Phase1Config:
     goal_y_range: tuple = (165.0, 215.0)
     goal_angle_range: tuple = (-0.20, 0.20)
     initial_distance_range: tuple = (70.0, 100.0)
-    initial_agent_offset: float = 105.0
+    # The T stem extends about 120 px behind the body origin. Together with
+    # the 15 px agent radius and a small margin, 139 px is contact-safe.
+    initial_agent_offset: float = 139.0
     save_videos: bool = True
     verify_videos: bool = True
     bootstrap_samples: int = 5000

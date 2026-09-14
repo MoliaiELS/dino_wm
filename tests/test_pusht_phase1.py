@@ -21,7 +21,7 @@ def test_geometric_oracle_solves_controlled_nominal_translation():
     env = PushTEnv(with_velocity=True, render_size=64)
     try:
         env.seed(11)
-        env.reset_to_state = np.array([256, 420, 256, 320, 0, 0, 0])
+        env.reset_to_state = np.array([256, 459, 256, 320, 0, 0, 0])
         env.reset()
         env.set_task_goal(np.array([256, 240, 0], dtype=np.float64))
         initial_snapshot = env.get_sim_state()

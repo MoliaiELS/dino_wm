@@ -134,6 +134,19 @@ Make a representation claim only if the learned temporal representation improves
 
 No training or data-generation job has been submitted yet. Phase 0 used short login-node CPU smoke tests only.
 
+### 2026-09-14 14:37 - Phase 1 micro-pilot validation attempt 1
+
+- Phase/purpose: Phase 1 oracle and six-scenario micro-pilot validation
+- Git commit: `6a3de46`
+- Command/config: `python -m pytest -q tests/test_pusht_phase1.py`
+- Dataset path/version: temporary pytest directory; no authoritative dataset write
+- Seeds: 11 and 1234
+- SLURM job ID/node: not applicable; remote login-node short test
+- Log/output path: terminal output
+- Status: failed
+- Key metrics/error: 2 tests failed because the initial 105-pixel agent offset overlapped the 120-pixel T stem plus 15-pixel agent radius, imparting unintended torque; nominal final coverage was 0
+- Decision/next action: initialize at the geometry-derived 139-pixel contact-safe offset and rerun the micro-pilot
+
 ### 2026-09-14 14:18 - Phase 0 deterministic validation
 
 - Phase/purpose: Phase 0 environment, normalization and planner-bound validation
