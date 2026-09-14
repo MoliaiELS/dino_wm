@@ -15,6 +15,7 @@ set -euo pipefail
 variant="${1:?dataset variant is required}"
 seed="${2:?training seed is required}"
 run_group="${3:-phase2_state_wm_v1}"
+normalization_variant="${4:-$variant}"
 
 source ~/miniforge3/etc/profile.d/conda.sh
 cd ~/dino_wm
@@ -24,6 +25,7 @@ export SDL_VIDEODRIVER=dummy
 output_dir="$DATASET_DIR/phase2_runs/$run_group/$variant/seed_$seed"
 python train_state_wm.py \
   --variant "$variant" \
+  --normalization-variant "$normalization_variant" \
   --seed "$seed" \
   --output-dir "$output_dir"
 

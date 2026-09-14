@@ -92,6 +92,7 @@ def test_phase2_loader_uses_manifest_windows_and_train_only_stats(tmp_path):
     stats = compute_train_normalization(dataset_dir, "D_SFR_balanced")
     # Validation/test states were shifted by 1000/2000 and cannot affect this mean.
     np.testing.assert_allclose(stats.state_mean[[0, 4, 6]], [4 / 3, 4 / 3, 4 / 3])
+    assert stats.state_std[5] == 1.0
     assert stats.count == 18
 
     train = PairedStateWindowDataset(

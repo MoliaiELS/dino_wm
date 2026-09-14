@@ -77,6 +77,10 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--dataset-dir", default=_default_dataset_dir())
     parser.add_argument("--variant", required=True)
+    parser.add_argument(
+        "--normalization-variant",
+        help="Training-only reference variant; use D_SF for the primary fixed-budget pair",
+    )
     parser.add_argument("--output-dir", required=True)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--epochs", type=int, default=50)
@@ -109,7 +113,8 @@ def main():
     output_dir = Path(args.output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
 
-    stats = compute_train_normalization(args.dataset_dir, args.variant)
+    normalization_variant = args.normalization_variant or args.variant
+    stats = compute_train_normalization(args.dataset_dir, normalization_variant)
     train_dataset = PairedStateWindowDataset(
         args.dataset_dir,
         args.variant,
@@ -176,6 +181,7 @@ def main():
         "model": model_config,
         "parameter_count": parameter_count,
         "normalization": stats.to_dict(),
+        "normalization_variant": normalization_variant,
         "train_windows": len(train_dataset),
         "valid_windows": len(valid_dataset),
         "train_branch_counts": train_dataset.branch_counts,

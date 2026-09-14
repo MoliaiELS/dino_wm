@@ -17,6 +17,11 @@ from torch.utils.data import Dataset
 EXPECTED_SCHEMA = "pusht-recovery-pairs-v1"
 ORACLE_STATE_DIM = 11
 ACTION_DIM = 2
+# The controlled translation pilot has nearly constant angle dimensions in
+# S/F1/F2.  Never divide those physical coordinates by numerical noise.  A
+# unit floor also makes a shared normalizer safe when R contains small contact
+# rotations that are absent from the common S+F1 core.
+DEFAULT_STATE_STD_FLOOR = np.ones(ORACLE_STATE_DIM, dtype=np.float64)
 
 
 def _read_json(path: Path):
@@ -99,7 +104,7 @@ def _trajectory_paths(dataset_dir: Path, manifest: dict, variant: str, split: st
             yield dataset_dir / "scenarios" / scenario_id / f"{branch}.npz"
 
 
-def compute_train_normalization(dataset_dir, variant, min_std=1e-4):
+def compute_train_normalization(dataset_dir, variant, min_std=None):
     """Compute statistics once per physical frame, never from valid/test data."""
 
     dataset_dir = Path(dataset_dir)
@@ -121,7 +126,14 @@ def compute_train_normalization(dataset_dir, variant, min_std=1e-4):
         raise ValueError(f"No training states found for {variant}")
     mean = total / count
     variance = np.maximum(squared_total / count - np.square(mean), 0.0)
-    std = np.maximum(np.sqrt(variance), float(min_std))
+    floor = (
+        DEFAULT_STATE_STD_FLOOR
+        if min_std is None
+        else np.broadcast_to(np.asarray(min_std, dtype=np.float64), (ORACLE_STATE_DIM,))
+    )
+    if np.any(floor <= 0):
+        raise ValueError("Normalization standard-deviation floors must be positive")
+    std = np.maximum(np.sqrt(variance), floor)
     return NormalizationStats(mean, std, count, variant)
 
 
