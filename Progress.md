@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: Phase 2 implementation started after the 200-scenario pilot passed Gate A
+- Overall status: Phase 2 state-model pipeline passed remote regression and end-to-end smoke validation; fixed-budget pilot training is next
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -87,11 +87,11 @@ Last updated: 2026-09-14
 
 ### Phase 2 - Experiment A
 
-- [~] Implement `StateWorldModel` using shared DINO-WM temporal/planning infrastructure.
+- [x] Implement `StateWorldModel` using shared DINO-WM temporal/planning infrastructure.
 - [ ] Train `D_S`, `D_SF`, `D_SFR`, `D_SF_balanced` and `D_SFR_balanced` models.
-- [ ] Measure 1/5/10/20-step dynamics prediction.
-- [ ] Measure counterfactual action ranking.
-- [ ] Measure closed-loop recovery success, coverage, steps and action cost.
+- [~] Measure 1/5/10/20-step dynamics prediction.
+- [~] Measure counterfactual action ranking.
+- [~] Measure closed-loop recovery success, coverage, steps and action cost.
 - [ ] Run at least 3 pilot seeds.
 - [ ] Decide whether the recovery signal is strong enough to proceed to Experiment B.
 
@@ -138,6 +138,45 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-14 19:30 - Phase 2 closed-loop interface smoke
+
+- Phase/purpose: exercise checkpoint-to-CEM-to-real-simulator recovery execution on one held-out pair
+- Git commit: `ca149d8`
+- Command/config: tiny smoke checkpoint; CPU; one test scenario; 35 execution steps; CEM horizon 4, 32 samples, top-k 4, 2 iterations
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`
+- Seeds: training seed 0; planner seed 0
+- SLURM job ID/node: not applicable; remote login-node short smoke
+- Log/output path: `$DATASET_DIR/phase2_runs/smoke_ca149d8/D_SFR_balanced/seed_0/closed_loop_smoke.json`
+- Status: completed
+- Key metrics/error: end-to-end state normalization, model rollout, bounded CEM and simulator execution succeeded; the deliberately under-trained 64-window model did not recover (0/1, final coverage 0.280)
+- Decision/next action: treat this only as an interface check, not an experiment result; train the full fixed-budget models before evaluating recovery
+
+### 2026-09-14 19:28 - Phase 2 real-data training and evaluation smoke
+
+- Phase/purpose: validate the full paired loader, train-only normalization, checkpoint and held-out prediction/ranking pipeline
+- Git commit: `ca149d8`
+- Command/config: `D_SFR_balanced`; CPU; 64 stratified train and 64 valid windows; 81,403-parameter reduced model; 20 epochs with 2 steps per epoch
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`
+- Seeds: 0
+- SLURM job ID/node: not applicable; remote login-node short smoke
+- Log/output path: `$DATASET_DIR/phase2_runs/smoke_ca149d8/D_SFR_balanced/seed_0/`
+- Status: completed
+- Key metrics/error: training statistics used 17,220 unique train frames; validation loss decreased from 0.433 to 0.358; prediction and ranking JSON was produced; ranking was 1/2 pairs and is not interpretable at smoke scale
+- Decision/next action: submit equal-capacity full-data `D_SF_balanced` and `D_SFR_balanced` pilot models under SLURM
+
+### 2026-09-14 19:25 - Phase 2 remote regression
+
+- Phase/purpose: validate Phase 0-2 runtime, paired loader, CPU-safe causal predictor, rollout and physical-unit metrics
+- Git commit: `ca149d8`
+- Command/config: `python -m pytest -q tests/test_pusht_phase0.py tests/test_pusht_phase1.py tests/test_pusht_phase2.py`
+- Dataset path/version: synthetic test fixtures plus the checked-in remote Phase 1 scenario
+- Seeds: existing test seeds plus Phase 2 model seed 3
+- SLURM job ID/node: not applicable; remote login-node short test
+- Log/output path: terminal output
+- Status: completed
+- Key metrics/error: 14 tests passed in 9.49 seconds; four dependency deprecation warnings only
+- Decision/next action: real-data smoke validation, then fixed-budget pilot training
 
 ### 2026-09-14 15:04 - Phase 1 final regression with remote fixture
 
