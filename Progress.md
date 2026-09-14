@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 1 - dataset generation pilot
-- Overall status: Phase 0 completed and verified remotely; Phase 1 has not started
+- Overall status: Phase 1 generator and audit implementation completed locally; remote validation pending
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -72,11 +72,11 @@ Last updated: 2026-09-14
 
 ### Phase 1 - Dataset generation pilot
 
-- [ ] Implement oracle nominal controller.
-- [ ] Implement perturbation protocols and severity bins.
-- [ ] Implement exact `S/F1/F2/R` branching.
-- [ ] Store scenario IDs, pair IDs, simulator state, RGB, actions and metadata.
-- [ ] Split scenarios before window generation.
+- [x] Implement a geometry-based oracle for the controlled goal-aligned translation pilot.
+- [x] Implement balanced agent/object lateral perturbations with low/medium/high severity bins.
+- [x] Implement exact `S/F1/F2/R` branching.
+- [x] Store scenario IDs, pair IDs, complete branch snapshots, aligned simulator state, RGB, actions and metadata.
+- [x] Split scenarios before window generation and keep every pair in one split.
 - [ ] Generate approximately 200 pilot paired scenarios.
 - [ ] Audit branch-state equality, temporal alignment and label balance.
 - [ ] Estimate final sample size from pilot variance.
@@ -181,6 +181,8 @@ Use the following template for every meaningful remote run:
 
 ### 2026-09-14
 
+- Implemented the Phase 1 paired PushT generator, dataset variants, post-split window indices, structural audit, bootstrap intervals and pilot sample-size estimator; remote validation is pending.
+- Scoped the pilot to goal-aligned translation with lateral perturbations; deferred rotation perturbations to OOD evaluation until a rotation-capable oracle is validated.
 - Implemented the Phase 0 PushT runtime, action, snapshot, task-evaluation and normalization changes.
 - Passed all 7 Phase 0 remote tests at commit `87f0d20`.
 - Generated and verified the direct PushT visual smoke-test artifacts on the remote server.
