@@ -1,5 +1,6 @@
 """A deterministic geometry-based oracle for the PushT pilot domain."""
 
+import math
 from dataclasses import dataclass
 
 import numpy as np
@@ -23,6 +24,9 @@ class OracleConfig:
     rear_support_distance: float = 120.0
     support_ray_length: float = 180.0
     support_ray_resolution: float = 1.0
+    clearance_margin: float = 15.0
+    orbit_angle_tolerance: float = 0.12
+    max_orbit_angle: float = 0.20
 
 
 class GeometricPushTOracle:
@@ -92,6 +96,47 @@ class GeometricPushTOracle:
         )
         return np.asarray(tuple(env.block.position)) + behind * offset
 
+    @staticmethod
+    def _wrapped_angle(angle):
+        return (float(angle) + np.pi) % (2 * np.pi) - np.pi
+
+    def _safe_staging_target(self, env, stage):
+        """Route around the object instead of crossing it during restaging."""
+        block_position = np.asarray(tuple(env.block.position), dtype=np.float64)
+        agent_position = np.asarray(tuple(env.agent.position), dtype=np.float64)
+        desired_relative = stage - block_position
+        current_relative = agent_position - block_position
+        current_direction, current_radius = self._unit(current_relative)
+        if current_radius < 1e-9:
+            current_direction = np.asarray([0.0, 1.0])
+
+        desired_angle = math.atan2(desired_relative[1], desired_relative[0])
+        current_angle = math.atan2(current_direction[1], current_direction[0])
+        angle_error = self._wrapped_angle(desired_angle - current_angle)
+        agent_radius = max(
+            float(getattr(shape, "radius", 0.0)) for shape in env.agent.shapes
+        )
+        clearance_radius = (
+            self.config.rear_support_distance
+            + agent_radius
+            + self.config.staging_margin
+            + self.config.clearance_margin
+        )
+
+        if abs(angle_error) <= self.config.orbit_angle_tolerance:
+            return stage
+        if current_radius < clearance_radius - self.config.staging_tolerance:
+            return block_position + current_direction * clearance_radius
+
+        next_angle = current_angle + np.clip(
+            angle_error,
+            -self.config.max_orbit_angle,
+            self.config.max_orbit_angle,
+        )
+        return block_position + clearance_radius * np.asarray(
+            [np.cos(next_angle), np.sin(next_angle)]
+        )
+
     def act(self, env):
         """Return one bounded relative command using current simulator state."""
         if env.check_success():
@@ -108,6 +153,10 @@ class GeometricPushTOracle:
         stage_direction, stage_distance = self._unit(stage - agent_position)
 
         if stage_distance > self.config.staging_tolerance:
+            navigation_target = self._safe_staging_target(env, stage)
+            stage_direction, stage_distance = self._unit(
+                navigation_target - agent_position
+            )
             magnitude = min(
                 self.config.max_staging_command,
                 stage_distance / env.action_scale,

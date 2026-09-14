@@ -173,6 +173,19 @@ No training or data-generation job has been submitted yet. Phase 0 used short lo
 - Key metrics/error: Gate A structural audit passed; S/F1/F2/R success rates were 1.0/0.0/0.0/0.5; exact branch error 0; recovery-minus-F1 coverage +0.249 with bootstrap 95% CI [0.019, 0.470]
 - Decision/next action: do not launch the full pilot yet; agent perturbations recovered but object perturbations exposed an inaccurate constant support distance, so replace it with robust Pymunk shape queries and recalibrate
 
+### 2026-09-14 14:47 - Phase 1 twelve-scenario calibration pilot after shape-query fix
+
+- Phase/purpose: reassess recovery after replacing numerical geometry unions with Pymunk shape queries
+- Git commit: `905105a`
+- Command/config: same 12-scenario/96-pixel calibration at `.../pusht_recovery_phase1_micro_905105a`
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_micro_905105a`
+- Seeds: base seed 20260914; 12 deterministic scenario seeds
+- SLURM job ID/node: not applicable; 28-second remote calibration run
+- Log/output path: dataset `audit.json` and per-branch trajectories
+- Status: completed
+- Key metrics/error: structural Gate A passed and branch error remained 0, but R success remained 0.5; trajectory inspection showed direct restaging crossed the object and rotated it by several radians
+- Decision/next action: add clearance-radius and orbit-waypoint navigation before restaging; full pilot remains blocked until both perturbation types recover reliably
+
 ### 2026-09-14 14:18 - Phase 0 deterministic validation
 
 - Phase/purpose: Phase 0 environment, normalization and planner-bound validation
