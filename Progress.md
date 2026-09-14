@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: Phase 2 state-model pipeline passed remote regression and end-to-end smoke validation; fixed-budget pilot training is next
+- Overall status: Phase 2 state-model pipeline passed remote validation; fixed-budget seed-0 pilot jobs 16182/16183 are running serially under the cluster job limit
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -88,7 +88,7 @@ Last updated: 2026-09-14
 ### Phase 2 - Experiment A
 
 - [x] Implement `StateWorldModel` using shared DINO-WM temporal/planning infrastructure.
-- [ ] Train `D_S`, `D_SF`, `D_SFR`, `D_SF_balanced` and `D_SFR_balanced` models.
+- [~] Train `D_S`, `D_SF`, `D_SFR`, `D_SF_balanced` and `D_SFR_balanced` models.
 - [~] Measure 1/5/10/20-step dynamics prediction.
 - [~] Measure counterfactual action ranking.
 - [~] Measure closed-loop recovery success, coverage, steps and action cost.
@@ -138,6 +138,19 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-14 19:32 - Phase 2 fixed-budget seed-0 pilot submission
+
+- Phase/purpose: first full-data equal-capacity comparison of neutral-failure versus recovery-rich dynamics
+- Git commit: `a98096d`
+- Command/config: 50 epochs, batch 128, 580,587-parameter state model, branch-balanced sampling; `D_SF_balanced` and `D_SFR_balanced`
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; outputs under `$DATASET_DIR/phase2_runs/pilot_a98096d/`
+- Seeds: 0 for both conditions
+- SLURM job ID/node: `16182` (`D_SF_balanced`, running on 4090node1) and `16183` (`D_SFR_balanced`, pending because of `AssocMaxJobsLimit`)
+- Log/output path: `$DATASET_DIR/logs/p2-sf-b0-16182.out` and `$DATASET_DIR/logs/p2-sfr-b0-16183.out`
+- Status: running
+- Key metrics/error: storage checked before submission (9.5 TB available); job 16182 reached epoch 6 with validation loss decreasing from 0.0181 to 0.00627 at the first status check
+- Decision/next action: allow the one-job association limit to serialize the runs; inspect unified-test prediction/ranking before scheduling more seeds
 
 ### 2026-09-14 19:30 - Phase 2 closed-loop interface smoke
 
