@@ -5,6 +5,7 @@ import numpy as np
 import pytest
 import torch
 
+from compare_state_wm import paired_bootstrap
 from models.state_world_model import StateWorldModel
 from phase2.data import (
     NormalizationStats,
@@ -160,3 +161,11 @@ def test_task_error_and_state_metrics_have_physical_units():
     )
     assert metrics["angle_mae_rad"] == 0.0
     assert metrics["sample_count"] == 2
+
+
+def test_paired_bootstrap_reports_the_paired_mean():
+    result = paired_bootstrap([1.0, 0.0, 1.0, 0.0], samples=200, seed=4)
+    assert result["n_pairs"] == 4
+    assert result["mean"] == 0.5
+    assert result["bootstrap_95_ci"][0] <= 0.5
+    assert result["bootstrap_95_ci"][1] >= 0.5
