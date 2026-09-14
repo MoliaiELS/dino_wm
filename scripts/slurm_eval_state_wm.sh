@@ -15,7 +15,8 @@ set -euo pipefail
 variant="${1:?dataset variant is required}"
 seed="${2:?training seed is required}"
 run_group="${3:?run group is required}"
-extra_args=("${@:4}")
+output_name="${4:-closed_loop.json}"
+extra_args=("${@:5}")
 
 source ~/miniforge3/etc/profile.d/conda.sh
 cd ~/dino_wm
@@ -25,7 +26,7 @@ export SDL_VIDEODRIVER=dummy
 run_dir="$DATASET_DIR/phase2_runs/$run_group/$variant/seed_$seed"
 python evaluate_state_wm.py \
   --checkpoint "$run_dir/checkpoint_best.pt" \
-  --output "$run_dir/closed_loop.json" \
+  --output "$run_dir/$output_name" \
   --skip-prediction \
   --skip-ranking \
   --closed-loop \
