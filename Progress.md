@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 1 - dataset generation pilot
-- Overall status: Phase 1 generator and audit implementation completed locally; remote validation pending
+- Overall status: Phase 1 implementation and calibration passed; 200-scenario pilot job 16174 is running
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -132,7 +132,33 @@ Make a representation claim only if the learned temporal representation improves
 
 ## Run log
 
-No training or data-generation job has been submitted yet. Phase 0 used short login-node CPU smoke tests only.
+Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-14 14:57 - Phase 1 full 200-scenario pilot
+
+- Phase/purpose: generate and audit the complete Phase 1 paired simulation pilot
+- Git commit: `a976e2c`
+- Command/config: SLURM CPU job; 200 scenarios, 224-pixel RGB, 50 nominal steps, 35 branch steps, 21-frame windows, 70/15/15 scenario split
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`
+- Seeds: base seed 20260914; deterministic per-scenario seeds
+- SLURM job ID/node: `16174`, `4090node3`, 4 CPUs, no GPU, 2-hour limit
+- Log/output path: `$DATASET_DIR/logs/phase1_pilot_16174.out`
+- Status: running
+- Key metrics/error: calibration and 9/9 Phase 0+1 regression tests passed before submission
+- Decision/next action: monitor through generation, full video/alignment audit and sample-size report; do not mark Phase 1 complete until the job exits successfully
+
+### 2026-09-14 14:56 - Phase 1 pilot submission attempt
+
+- Phase/purpose: submit the full Phase 1 pilot
+- Git commit: `a976e2c`
+- Command/config: initial `sbatch` request included `--mem=8G`
+- Dataset path/version: intended `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`; no data generated
+- Seeds: not started
+- SLURM job ID/node: none
+- Log/output path: submission stderr
+- Status: failed
+- Key metrics/error: Slurm rejected the request because cluster nodes advertise only `1M` memory in their controller metadata
+- Decision/next action: omitted the invalid explicit memory request and submitted CPU job 16174; no cluster configuration was changed
 
 ### 2026-09-14 14:37 - Phase 1 micro-pilot validation attempt 1
 
