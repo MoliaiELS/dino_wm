@@ -48,10 +48,20 @@ def _seed_everything(seed):
         torch.cuda.manual_seed_all(seed)
 
 
-def _run_epoch(model, loader, device, optimizer=None, max_steps=None):
+def _run_epoch(
+    model,
+    loader,
+    device,
+    optimizer=None,
+    max_steps=None,
+    rollout_horizon=0,
+    rollout_weight=0.0,
+):
     training = optimizer is not None
     model.train(training)
     total_loss = 0.0
+    total_one_step_loss = 0.0
+    total_rollout_loss = 0.0
     sample_count = 0
     for step, batch in enumerate(loader):
         if max_steps is not None and step >= max_steps:
@@ -59,7 +69,18 @@ def _run_epoch(model, loader, device, optimizer=None, max_steps=None):
         states = batch["states"].to(device)
         actions = batch["actions"].to(device)
         with torch.set_grad_enabled(training):
-            _, loss = model(states, actions)
+            _, one_step_loss = model(states, actions)
+            horizon = min(int(rollout_horizon), actions.shape[1])
+            if horizon > 0 and rollout_weight > 0:
+                predicted_rollout = model.rollout(
+                    states[:, :1], actions[:, :horizon]
+                )
+                rollout_loss = torch.nn.functional.mse_loss(
+                    predicted_rollout, states[:, 1 : horizon + 1]
+                )
+            else:
+                rollout_loss = one_step_loss.new_zeros(())
+            loss = one_step_loss + float(rollout_weight) * rollout_loss
             if training:
                 optimizer.zero_grad(set_to_none=True)
                 loss.backward()
@@ -67,10 +88,16 @@ def _run_epoch(model, loader, device, optimizer=None, max_steps=None):
                 optimizer.step()
         batch_size = states.shape[0]
         total_loss += float(loss.detach().item()) * batch_size
+        total_one_step_loss += float(one_step_loss.detach().item()) * batch_size
+        total_rollout_loss += float(rollout_loss.detach().item()) * batch_size
         sample_count += batch_size
     if sample_count == 0:
         raise RuntimeError("No batches were processed")
-    return total_loss / sample_count
+    return {
+        "loss": total_loss / sample_count,
+        "one_step_loss": total_one_step_loss / sample_count,
+        "rollout_loss": total_rollout_loss / sample_count,
+    }
 
 
 def parse_args():
@@ -99,6 +126,8 @@ def parse_args():
     parser.add_argument("--heads", type=int, default=4)
     parser.add_argument("--mlp-dim", type=int, default=256)
     parser.add_argument("--dropout", type=float, default=0.1)
+    parser.add_argument("--rollout-horizon", type=int, default=5)
+    parser.add_argument("--rollout-weight", type=float, default=1.0)
     return parser.parse_args()
 
 
@@ -108,6 +137,8 @@ def main():
         raise ValueError("Set DATASET_DIR or pass --dataset-dir")
     if args.epochs <= 0 or args.batch_size <= 0:
         raise ValueError("epochs and batch size must be positive")
+    if args.rollout_horizon < 0 or args.rollout_weight < 0:
+        raise ValueError("rollout horizon and weight must be non-negative")
     _seed_everything(args.seed)
     device = _device(args.device)
     output_dir = Path(args.output_dir)
@@ -192,21 +223,35 @@ def main():
     history = []
     best_loss = float("inf")
     for epoch in range(1, args.epochs + 1):
-        train_loss = _run_epoch(
+        train_metrics = _run_epoch(
             model,
             train_loader,
             device,
             optimizer=optimizer,
             max_steps=args.max_steps_per_epoch,
+            rollout_horizon=args.rollout_horizon,
+            rollout_weight=args.rollout_weight,
         )
-        valid_loss = _run_epoch(
+        valid_metrics = _run_epoch(
             model,
             valid_loader,
             device,
             optimizer=None,
             max_steps=args.max_steps_per_epoch,
+            rollout_horizon=args.rollout_horizon,
+            rollout_weight=args.rollout_weight,
         )
-        row = {"epoch": epoch, "train_loss": train_loss, "valid_loss": valid_loss}
+        train_loss = train_metrics["loss"]
+        valid_loss = valid_metrics["loss"]
+        row = {
+            "epoch": epoch,
+            "train_loss": train_loss,
+            "train_one_step_loss": train_metrics["one_step_loss"],
+            "train_rollout_loss": train_metrics["rollout_loss"],
+            "valid_loss": valid_loss,
+            "valid_one_step_loss": valid_metrics["one_step_loss"],
+            "valid_rollout_loss": valid_metrics["rollout_loss"],
+        }
         history.append(row)
         print(json.dumps(row), flush=True)
         checkpoint = {

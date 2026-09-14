@@ -19,6 +19,7 @@ from phase2.evaluation import (
     state_planning_cost,
     task_error,
 )
+from train_state_wm import _run_epoch
 
 
 BRANCHES = ("S", "F1", "F2", "R")
@@ -226,3 +227,34 @@ def test_state_planning_cost_rewards_the_goal_aligned_staging_pose():
     states[1, 0] = 139.0
     costs = state_planning_cost(states, staging_weight=0.25)
     assert costs[0] < costs[1]
+
+
+def test_training_epoch_combines_teacher_forced_and_rollout_losses():
+    model = StateWorldModel(
+        max_context=5,
+        model_dim=32,
+        state_emb_dim=16,
+        action_emb_dim=8,
+        depth=1,
+        heads=4,
+        mlp_dim=32,
+        dim_head=8,
+        dropout=0.0,
+    )
+    loader = [
+        {
+            "states": torch.randn(2, 6, 11),
+            "actions": torch.randn(2, 5, 2).clamp(-1, 1),
+        }
+    ]
+    metrics = _run_epoch(
+        model,
+        loader,
+        torch.device("cpu"),
+        rollout_horizon=3,
+        rollout_weight=1.0,
+    )
+    assert metrics["loss"] == pytest.approx(
+        metrics["one_step_loss"] + metrics["rollout_loss"]
+    )
+    assert metrics["rollout_loss"] > 0
