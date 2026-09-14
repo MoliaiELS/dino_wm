@@ -18,8 +18,11 @@ class OracleConfig:
     min_push_command: float = 0.06
     push_gain: float = 0.75
     # The controlled pilot moves opposite the T stem direction. The stem's
-    # rear support is 120 px from the body origin in the current environment.
+    # rear support is 120 px from the body origin in the current environment;
+    # this is also the fallback if a shape query cannot find the surface.
     rear_support_distance: float = 120.0
+    support_ray_length: float = 180.0
+    support_ray_resolution: float = 1.0
 
 
 class GeometricPushTOracle:
@@ -40,13 +43,50 @@ class GeometricPushTOracle:
             return np.zeros(2, dtype=np.float64), norm
         return np.asarray(vector, dtype=np.float64) / norm, norm
 
+    def _support_distance(self, env, direction):
+        """Find the first exit from the union of block shapes along a ray.
+
+        Pymunk's signed point query avoids the topology instability observed
+        when unioning the T's two touching polygons with Shapely.
+        """
+        center = np.asarray(tuple(env.block.position), dtype=np.float64)
+
+        def inside(distance):
+            point = tuple(center + direction * distance)
+            return any(shape.point_query(point).distance <= 1e-7 for shape in env.block.shapes)
+
+        previous = 0.0
+        seen_inside = inside(0.0)
+        distances = np.arange(
+            self.config.support_ray_resolution,
+            self.config.support_ray_length + self.config.support_ray_resolution,
+            self.config.support_ray_resolution,
+        )
+        for distance in distances:
+            is_inside = inside(float(distance))
+            if is_inside:
+                seen_inside = True
+                previous = float(distance)
+                continue
+            if seen_inside:
+                lower, upper = previous, float(distance)
+                for _ in range(12):
+                    midpoint = (lower + upper) / 2
+                    if inside(midpoint):
+                        lower = midpoint
+                    else:
+                        upper = midpoint
+                return lower
+        return self.config.rear_support_distance
+
     def staging_point(self, env, push_direction):
         behind = -np.asarray(push_direction, dtype=np.float64)
+        support_distance = self._support_distance(env, behind)
         agent_radius = max(
             float(getattr(shape, "radius", 0.0)) for shape in env.agent.shapes
         )
         offset = (
-            self.config.rear_support_distance
+            support_distance
             + agent_radius
             + self.config.staging_margin
         )
