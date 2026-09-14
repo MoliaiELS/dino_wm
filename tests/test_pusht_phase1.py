@@ -59,7 +59,7 @@ def test_micro_dataset_has_exact_pairs_splits_and_alignment(tmp_path):
     assert audit["temporal_alignment_violations"] == 0
     assert audit["perturbation_type_counts"] == {
         "agent_lateral": 3,
-        "object_lateral": 3,
+        "agent_retreat": 3,
     }
     assert audit["severity_counts"] == {"low": 2, "medium": 2, "high": 2}
     assert set(manifest["scenario_splits"].values()) == {"train", "valid", "test"}

@@ -73,7 +73,7 @@ Last updated: 2026-09-14
 ### Phase 1 - Dataset generation pilot
 
 - [x] Implement a geometry-based oracle for the controlled goal-aligned translation pilot.
-- [x] Implement balanced agent/object lateral perturbations with low/medium/high severity bins.
+- [x] Implement balanced agent-lateral/agent-retreat perturbations with low/medium/high severity bins.
 - [x] Implement exact `S/F1/F2/R` branching.
 - [x] Store scenario IDs, pair IDs, complete branch snapshots, aligned simulator state, RGB, actions and metadata.
 - [x] Split scenarios before window generation and keep every pair in one split.
@@ -185,6 +185,19 @@ No training or data-generation job has been submitted yet. Phase 0 used short lo
 - Status: completed
 - Key metrics/error: structural Gate A passed and branch error remained 0, but R success remained 0.5; trajectory inspection showed direct restaging crossed the object and rotated it by several radians
 - Decision/next action: add clearance-radius and orbit-waypoint navigation before restaging; full pilot remains blocked until both perturbation types recover reliably
+
+### 2026-09-14 14:50 - Phase 1 twelve-scenario calibration with safe restaging
+
+- Phase/purpose: validate clearance-radius/orbit navigation on both perturbation types
+- Git commit: `58e4567`
+- Command/config: 12 scenarios, 96-pixel RGB, 50 nominal steps and 35 branch steps
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_micro_58e4567`
+- Seeds: base seed 20260914; 12 deterministic scenario seeds
+- SLURM job ID/node: not applicable; 28-second remote calibration run
+- Log/output path: dataset `audit.json` and inspected `R.npz` trajectories
+- Status: completed
+- Key metrics/error: S/F1/F2/R success 1.0/0.0/0.0/0.5; recovery-minus-F1 coverage +0.307, bootstrap 95% CI [0.099, 0.505]; all object-lateral cases accumulated contact torque and failed
+- Decision/next action: constrain the feasibility pilot to agent-lateral and agent-retreat failures; reserve object displacement and rotation for OOD after validating a rotation-capable oracle
 
 ### 2026-09-14 14:18 - Phase 0 deterministic validation
 

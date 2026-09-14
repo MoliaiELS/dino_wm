@@ -32,7 +32,7 @@ VARIANTS = {
 }
 PERTURBATION_LEVELS = {
     "agent_lateral": {"low": 30.0, "medium": 55.0, "high": 80.0},
-    "object_lateral": {"low": 15.0, "medium": 30.0, "high": 45.0},
+    "agent_retreat": {"low": 30.0, "medium": 55.0, "high": 80.0},
 }
 SIM_STATE_FIELDS = (
     "agent.position.x",
@@ -382,9 +382,14 @@ class PushTPhase1Generator:
         goal_position = np.asarray(perturbed["goal_pose"][:2], dtype=np.float64)
         motion = goal_position - block_position
         motion /= max(float(np.linalg.norm(motion)), 1e-9)
-        lateral = np.asarray([-motion[1], motion[0]]) * spec["sign"]
-        displacement = lateral * spec["requested_magnitude"]
-        target = "agent" if spec["perturbation_type"] == "agent_lateral" else "block"
+        if spec["perturbation_type"] == "agent_lateral":
+            perturbation_direction = np.asarray([-motion[1], motion[0]]) * spec["sign"]
+        elif spec["perturbation_type"] == "agent_retreat":
+            perturbation_direction = -motion
+        else:
+            raise ValueError(f"Unknown perturbation type {spec['perturbation_type']}")
+        displacement = perturbation_direction * spec["requested_magnitude"]
+        target = "agent"
         original = np.asarray(perturbed[target]["position"], dtype=np.float64)
         updated = np.clip(original + displacement, 25.0, 487.0)
         perturbed[target]["position"] = updated

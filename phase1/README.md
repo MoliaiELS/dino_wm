@@ -4,9 +4,9 @@ Each scenario is assigned to `train`, `valid` or `test` before any windows are
 created. All `S/F1/F2/R` branches from one `pair_id` remain in that split.
 
 The pilot is intentionally a controlled goal-aligned translation domain. It
-uses balanced agent-lateral and object-lateral perturbations at low, medium and
-high severity. Rotation perturbations are reserved for OOD evaluation until a
-rotation-capable oracle has been validated.
+uses balanced agent-lateral and agent-retreat perturbations at low, medium and
+high severity. Object displacement and rotation perturbations are reserved for
+OOD evaluation until a rotation-capable oracle has been validated.
 
 Each scenario directory contains:
 
