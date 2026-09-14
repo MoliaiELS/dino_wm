@@ -383,6 +383,12 @@ next action
 - 调试时优先检查远端日志、环境、GPU、数据路径和实际文件。
 - 训练和数据生成完成后，记录产物位置及是否可重建，不把大型二进制产物提交到 Git。
 
+## 14. 文件与实现索引
+
+- `IMPLEMENTATION_OVERVIEW.md`：区分原始 DINO-WM、本项目新增模块和对原文件的必要修改，并记录代码调用关系、完成度与当前结论。
+- `Experiment_Report_Phase2.md`：Phase 0–2 的中文实验报告，包含配置、指标定义、图表、数据、局限和 Gate 判断。
+- `Progress.md`：实现、远端运行、失败、指标与实验决策的连续记录。
+
 ## 核心原则
 
 本地编辑并提交，远端拉取后执行；先用严格配对的 PushT 仿真证明 recovery dynamics 信号，再投入视觉 representation 和更强 OOD 结论。

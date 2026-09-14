@@ -142,6 +142,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-14 22:05 - 原始框架与 recovery 扩展代码整理
+
+- Phase/purpose: 建立 Phase 0–2 文件索引，明确原始 DINO-WM、对原文件的兼容性修改、本项目新增模块以及生成产物之间的边界
+- Git commit: pending
+- Command/config: 以原始框架提交 `5b12dea` 为基线审计当前变更；仅编辑文档，不执行本地项目代码
+- Dataset path/version: 未读取或修改数据集；远端权威数据仍为 `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`
+- Seeds: not applicable
+- SLURM job ID/node: not applicable
+- Log/output path: `IMPLEMENTATION_OVERVIEW.md`、`AGENTS.md`、`Progress.md`
+- Status: completed
+- Key metrics/error: 将原始视觉 DINO-WM 路线与当前 oracle-state Experiment A 明确分开；列出 11 个被修改的原框架文件、Phase 0/1/2 新增入口、测试、报告资产、远端产物和未完成项
+- Decision/next action: 以后以 `IMPLEMENTATION_OVERVIEW.md` 作为代码地图；Gate B 仍未通过，下一步只在 validation scenarios 上修复 goal-retention，再使用 fresh confirmatory test
+
 ### 2026-09-14 21:36 - Phase 1/2 Chinese experiment report and figures
 
 - Phase/purpose: consolidate the paired dataset, corrected fixed-budget configurations, metric definitions, three-seed results, validity limits and Gate B decision into a self-contained report
