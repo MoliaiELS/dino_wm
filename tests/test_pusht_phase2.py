@@ -239,6 +239,7 @@ def test_prediction_evaluation_can_filter_recovery_prefix(tmp_path):
         horizons=(1,),
         branches=("R",),
         start_phases={"reposition", "recontact"},
+        split="valid",
     )
     assert metrics["1"]["sample_count"] == 2
 
@@ -293,6 +294,7 @@ def test_state_cem_uses_bounded_low_frequency_action_blocks():
         topk=4,
         iterations=2,
         action_repeat=2,
+        max_action_norm=0.25,
         seed=7,
     )
     initial = np.zeros(11, dtype=np.float32)
@@ -301,9 +303,50 @@ def test_state_cem_uses_bounded_low_frequency_action_blocks():
     actions, cost = planner.plan(initial)
     assert actions.shape == (5, 2)
     assert np.all(actions >= -1.0) and np.all(actions <= 1.0)
+    assert np.max(np.linalg.norm(actions, axis=1)) <= 0.250001
     np.testing.assert_allclose(actions[0], actions[1])
     np.testing.assert_allclose(actions[2], actions[3])
     assert np.isfinite(cost)
+
+
+def test_state_cem_rejects_a_proposal_that_cannot_beat_noop():
+    class ActionMovesObjectWorldModel(torch.nn.Module):
+        def __init__(self):
+            super().__init__()
+            self.anchor = torch.nn.Parameter(torch.zeros(()))
+
+        def rollout(self, initial_states, actions):
+            states = initial_states[:, -1:].repeat(1, actions.shape[1], 1)
+            states = states.clone()
+            states[:, :, 2] += torch.cumsum(actions[:, :, 0].abs(), dim=1)
+            return states
+
+    stats = NormalizationStats(
+        state_mean=np.zeros(11, dtype=np.float32),
+        state_std=np.ones(11, dtype=np.float32),
+        count=1,
+        variant="test",
+    )
+    planner = StateCEMPlanner(
+        ActionMovesObjectWorldModel(),
+        stats,
+        "cpu",
+        horizon=4,
+        num_samples=16,
+        topk=4,
+        iterations=2,
+        action_repeat=2,
+        staging_weight=0.0,
+        action_cost=0.0,
+        min_predicted_improvement=0.01,
+        seed=11,
+    )
+    initial = np.zeros(11, dtype=np.float32)
+    initial[5] = 1.0
+    actions, cost = planner.plan(initial)
+    np.testing.assert_array_equal(actions, np.zeros((4, 2), dtype=np.float32))
+    assert planner.last_diagnostics["accepted"] is False
+    assert cost == pytest.approx(planner.last_diagnostics["noop_cost"])
 
 
 def test_state_planning_cost_rewards_the_goal_aligned_staging_pose():

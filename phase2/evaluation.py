@@ -61,13 +61,19 @@ def _denormalize_tensor(states, stats: NormalizationStats):
     return states * std + mean
 
 
-def _test_scenarios(manifest, max_scenarios=None):
+def _split_scenarios(manifest, split="test", max_scenarios=None):
+    if split not in {"train", "valid", "test"}:
+        raise ValueError(f"Unknown dataset split {split}")
     scenarios = sorted(
         scenario_id
-        for scenario_id, split in manifest["scenario_splits"].items()
-        if split == "test"
+        for scenario_id, scenario_split in manifest["scenario_splits"].items()
+        if scenario_split == split
     )
     return scenarios if max_scenarios is None else scenarios[:max_scenarios]
+
+
+def _test_scenarios(manifest, max_scenarios=None):
+    return _split_scenarios(manifest, "test", max_scenarios)
 
 
 def _load_branch(dataset_dir: Path, scenario_id: str, branch: str):
@@ -120,12 +126,13 @@ def evaluate_prediction_horizons(
     max_scenarios=None,
     branches=EVAL_BRANCHES,
     start_phases=None,
+    split="test",
 ):
     """Evaluate matched test windows, optionally restricted by branch/phase."""
 
     dataset_dir = Path(dataset_dir)
     manifest = load_manifest(dataset_dir)
-    scenarios = _test_scenarios(manifest, max_scenarios)
+    scenarios = _split_scenarios(manifest, split, max_scenarios)
     results = {}
     model.eval()
     for horizon in horizons:
@@ -169,6 +176,7 @@ def evaluate_prediction_by_branch(
     batch_size=512,
     stride=1,
     max_scenarios=None,
+    split="test",
 ):
     """Expose whether aggregate gains occur on nominal, failure or recovery data."""
     return {
@@ -182,6 +190,7 @@ def evaluate_prediction_by_branch(
             stride=stride,
             max_scenarios=max_scenarios,
             branches=(branch,),
+            split=split,
         )
         for branch in EVAL_BRANCHES
     }
@@ -194,6 +203,7 @@ def evaluate_counterfactual_ranking(
     stats,
     device,
     max_scenarios=None,
+    split="test",
 ):
     """Rank the three continuations from each identical post-perturbation state."""
 
@@ -201,7 +211,7 @@ def evaluate_counterfactual_ranking(
     manifest = load_manifest(dataset_dir)
     per_pair = []
     model.eval()
-    for scenario_id in _test_scenarios(manifest, max_scenarios):
+    for scenario_id in _split_scenarios(manifest, split, max_scenarios):
         records = {branch: _load_branch(dataset_dir, scenario_id, branch) for branch in ("F1", "F2", "R")}
         initials = np.stack([records[branch]["states"][0] for branch in ("F1", "F2", "R")])
         if not np.array_equal(initials[0], initials[1]) or not np.array_equal(initials[0], initials[2]):
@@ -261,6 +271,11 @@ class StateCEMPlanner:
         smoothness_cost=0.01,
         staging_weight=0.25,
         staging_distance=139.0,
+        max_action_norm=None,
+        trajectory_cost_weight=0.0,
+        progress_regression_weight=0.0,
+        object_speed_weight=0.0,
+        min_predicted_improvement=None,
         seed=0,
     ):
         if not 1 < topk <= num_samples:
@@ -278,11 +293,77 @@ class StateCEMPlanner:
         self.smoothness_cost = float(smoothness_cost)
         self.staging_weight = float(staging_weight)
         self.staging_distance = float(staging_distance)
+        self.max_action_norm = (
+            None if max_action_norm is None else float(max_action_norm)
+        )
+        self.trajectory_cost_weight = float(trajectory_cost_weight)
+        self.progress_regression_weight = float(progress_regression_weight)
+        self.object_speed_weight = float(object_speed_weight)
+        self.min_predicted_improvement = (
+            None
+            if min_predicted_improvement is None
+            else float(min_predicted_improvement)
+        )
         if self.action_repeat < 1:
             raise ValueError("action_repeat must be positive")
+        if self.max_action_norm is not None and self.max_action_norm <= 0:
+            raise ValueError("max_action_norm must be positive")
+        if min(
+            self.trajectory_cost_weight,
+            self.progress_regression_weight,
+            self.object_speed_weight,
+        ) < 0:
+            raise ValueError("planner cost weights cannot be negative")
         self.control_horizon = int(math.ceil(self.horizon / self.action_repeat))
         generator_device = self.device.type if self.device.type == "cuda" else "cpu"
         self.generator = torch.Generator(device=generator_device).manual_seed(seed)
+        self.last_diagnostics = None
+
+    def _project_controls(self, controls):
+        controls = torch.clamp(controls, -1.0, 1.0)
+        if self.max_action_norm is None:
+            return controls
+        norms = torch.linalg.vector_norm(controls, dim=-1, keepdim=True)
+        scale = torch.clamp(self.max_action_norm / torch.clamp(norms, min=1e-8), max=1.0)
+        return controls * scale
+
+    def _sequence_cost(self, initial, candidates):
+        states = initial.expand(candidates.shape[0], -1, -1)
+        predicted = self.model.rollout(states, candidates)
+        predicted_raw = _denormalize_tensor(predicted, self.stats)
+        final_raw = predicted_raw[:, -1]
+        effort = candidates.square().sum(dim=(1, 2))
+        smoothness = (candidates[:, 1:] - candidates[:, :-1]).square().sum(
+            dim=(1, 2)
+        )
+        costs = (
+            state_planning_cost(
+                final_raw,
+                staging_weight=self.staging_weight,
+                staging_distance=self.staging_distance,
+            )
+            + self.action_cost * effort
+            + self.smoothness_cost * smoothness
+        )
+        if self.trajectory_cost_weight > 0:
+            trajectory_cost = state_planning_cost(
+                predicted_raw,
+                staging_weight=self.staging_weight,
+                staging_distance=self.staging_distance,
+            ).mean(dim=1)
+            costs = costs + self.trajectory_cost_weight * trajectory_cost
+        if self.progress_regression_weight > 0:
+            initial_raw = _denormalize_tensor(initial[:, -1], self.stats)
+            initial_error = task_error(initial_raw).expand(candidates.shape[0], 1)
+            errors = torch.cat([initial_error, task_error(predicted_raw)], dim=1)
+            regression = torch.relu(errors[:, 1:] - errors[:, :-1]).mean(dim=1)
+            costs = costs + self.progress_regression_weight * regression
+        if self.object_speed_weight > 0:
+            goal_distance = torch.linalg.vector_norm(final_raw[:, 2:4], dim=-1)
+            near_goal = 1.0 - torch.clamp(goal_distance / 50.0, 0.0, 1.0)
+            object_speed = torch.linalg.vector_norm(final_raw[:, 8:10], dim=-1) / 100.0
+            costs = costs + self.object_speed_weight * near_goal * object_speed
+        return costs
 
     @torch.no_grad()
     def plan(self, raw_state, warm_start=None):
@@ -311,38 +392,45 @@ class StateCEMPlanner:
                 device=self.device,
                 generator=self.generator,
             )
-            control_candidates = torch.clamp(
-                mean[None] + std[None] * noise, -1.0, 1.0
-            )
-            control_candidates[0] = torch.clamp(mean, -1.0, 1.0)
+            control_candidates = self._project_controls(mean[None] + std[None] * noise)
+            # Keep a safe hold option and the current search mean in every
+            # iteration instead of allowing both to disappear after iteration 1.
+            control_candidates[0].zero_()
+            control_candidates[1] = self._project_controls(mean)
             candidates = control_candidates.repeat_interleave(
                 self.action_repeat, dim=1
             )[:, : self.horizon]
-            states = initial.expand(self.num_samples, -1, -1)
-            predicted = self.model.rollout(states, candidates)
-            final_raw = _denormalize_tensor(predicted[:, -1], self.stats)
-            effort = candidates.square().sum(dim=(1, 2))
-            smoothness = (candidates[:, 1:] - candidates[:, :-1]).square().sum(
-                dim=(1, 2)
-            )
-            costs = (
-                state_planning_cost(
-                    final_raw,
-                    staging_weight=self.staging_weight,
-                    staging_distance=self.staging_distance,
-                )
-                + self.action_cost * effort
-                + self.smoothness_cost * smoothness
-            )
+            costs = self._sequence_cost(initial, candidates)
             elite_costs, elite_indices = torch.topk(costs, self.topk, largest=False)
             elite = control_candidates[elite_indices]
-            mean = torch.clamp(elite.mean(dim=0), -1.0, 1.0)
+            mean = self._project_controls(elite.mean(dim=0))
             std = torch.clamp(elite.std(dim=0, unbiased=False), min=0.03, max=1.0)
             best_cost = float(elite_costs[0].item())
-        action_sequence = mean.repeat_interleave(self.action_repeat, dim=0)[
+        proposed_sequence = mean.repeat_interleave(self.action_repeat, dim=0)[
             : self.horizon
         ]
-        return action_sequence.cpu().numpy(), best_cost
+        zero_sequence = torch.zeros_like(proposed_sequence)
+        final_costs = self._sequence_cost(
+            initial,
+            torch.stack([proposed_sequence, zero_sequence]),
+        )
+        proposed_cost = float(final_costs[0].item())
+        noop_cost = float(final_costs[1].item())
+        predicted_improvement = noop_cost - proposed_cost
+        accepted = (
+            self.min_predicted_improvement is None
+            or predicted_improvement >= self.min_predicted_improvement
+        )
+        action_sequence = proposed_sequence if accepted else zero_sequence
+        selected_cost = proposed_cost if accepted else noop_cost
+        self.last_diagnostics = {
+            "search_best_cost": best_cost,
+            "proposed_cost": proposed_cost,
+            "noop_cost": noop_cost,
+            "predicted_improvement": predicted_improvement,
+            "accepted": bool(accepted),
+        }
+        return action_sequence.cpu().numpy(), selected_cost
 
 
 def evaluate_closed_loop_recovery(
@@ -355,6 +443,7 @@ def evaluate_closed_loop_recovery(
     max_steps=35,
     save_videos=False,
     planner_kwargs=None,
+    split="test",
 ):
     """Replan after every real simulator step from held-out failure snapshots."""
 
@@ -363,7 +452,7 @@ def evaluate_closed_loop_recovery(
 
     dataset_dir = Path(dataset_dir)
     manifest = load_manifest(dataset_dir)
-    scenarios = _test_scenarios(manifest, max_scenarios)
+    scenarios = _split_scenarios(manifest, split, max_scenarios)
     output_dir = None if output_dir is None else Path(output_dir)
     if output_dir is not None:
         output_dir.mkdir(parents=True, exist_ok=True)
@@ -389,6 +478,7 @@ def evaluate_closed_loop_recovery(
             action_cost = 0.0
             executed_actions = []
             predicted_costs = []
+            planner_diagnostics = []
             coverages = [float(env.evaluate_task()["coverage"])]
             success = bool(env.evaluate_task()["success"])
             steps = 0
@@ -401,6 +491,7 @@ def evaluate_closed_loop_recovery(
                 action_cost += float(np.linalg.norm(action))
                 executed_actions.append(action.tolist())
                 predicted_costs.append(predicted_cost)
+                planner_diagnostics.append(dict(planner.last_diagnostics))
                 steps += 1
                 metrics = env.evaluate_task()
                 coverages.append(float(metrics["coverage"]))
@@ -418,23 +509,69 @@ def evaluate_closed_loop_recovery(
                     "initial_coverage": coverages[0],
                     "final_coverage": coverages[-1],
                     "max_coverage": max(coverages),
+                    "peak_step": int(np.argmax(coverages)),
+                    "coverage_retention_loss": max(coverages) - coverages[-1],
                     "action_cost": action_cost,
                     "actions": executed_actions,
                     "coverage_trace": coverages,
                     "predicted_cost_trace": predicted_costs,
+                    "planner_diagnostics": planner_diagnostics,
                 }
             )
             if save_videos and output_dir is not None:
                 imageio.mimsave(output_dir / f"{scenario_id}.mp4", frames, fps=10)
     finally:
         env.close()
+    action_rows = [
+        np.asarray(row["actions"], dtype=np.float64)
+        for row in rows
+        if row["actions"]
+    ]
+    all_actions = (
+        np.concatenate(action_rows, axis=0)
+        if action_rows else np.empty((0, 2), dtype=np.float64)
+    )
+    coverage_deltas = np.concatenate(
+        [np.diff(np.asarray(row["coverage_trace"], dtype=np.float64)) for row in rows]
+    )
+    thresholds = (0.5, 0.7, 0.8, 0.9, 0.95)
     return {
+        "split": split,
         "scenario_count": len(rows),
         "success_rate": float(np.mean([row["success"] for row in rows])),
         "mean_final_coverage": float(np.mean([row["final_coverage"] for row in rows])),
         "mean_max_coverage": float(np.mean([row["max_coverage"] for row in rows])),
         "mean_steps": float(np.mean([row["steps"] for row in rows])),
         "mean_action_cost": float(np.mean([row["action_cost"] for row in rows])),
+        "mean_coverage_retention_loss": float(np.mean([
+            row["coverage_retention_loss"] for row in rows
+        ])),
+        "mean_peak_step": float(np.mean([row["peak_step"] for row in rows])),
+        "coverage_decrease_step_fraction": float(np.mean(coverage_deltas < -1e-4)),
+        "mean_executed_action_norm": (
+            float(np.linalg.norm(all_actions, axis=1).mean())
+            if len(all_actions) else 0.0
+        ),
+        "executed_action_saturation_fraction": (
+            float(np.any(np.abs(all_actions) >= 0.999, axis=1).mean())
+            if len(all_actions) else 0.0
+        ),
+        "noop_action_fraction": (
+            float((np.linalg.norm(all_actions, axis=1) <= 1e-8).mean())
+            if len(all_actions) else 0.0
+        ),
+        "reach_rate_by_coverage": {
+            str(threshold): float(np.mean([
+                row["max_coverage"] >= threshold for row in rows
+            ]))
+            for threshold in thresholds
+        },
+        "final_rate_by_coverage": {
+            str(threshold): float(np.mean([
+                row["final_coverage"] >= threshold for row in rows
+            ]))
+            for threshold in thresholds
+        },
         "per_scenario": rows,
     }
 

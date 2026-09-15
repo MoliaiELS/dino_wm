@@ -153,6 +153,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-15 11:05 - Phase 2 validation-only planner repair implementation
+
+- Phase/purpose: remove the observed planner/data-distribution mismatch without retraining or touching the test split for model selection
+- Git commit: this implementation commit; exact hash to be recorded after remote validation
+- Command/config: add explicit train/valid/test evaluator routing; norm-bounded CEM actions; persistent zero-action candidate; predicted-improvement safeguard; trajectory, progress-regression and near-goal object-speed costs; coverage-retention/action-distribution diagnostics
+- Dataset path/version: implementation targets `$DATASET_DIR/pusht_recovery_phase1_pilot_v2`; no dataset mutation
+- Seeds: existing SFN/SFR checkpoints, training seeds 0/1/2; initial planner selection will use validation scenarios only
+- SLURM job ID/node: not submitted
+- Log/output path: pending
+- Status: implementation completed locally; remote regression pending
+- Key metrics/error: prior diagnostic found R train action norm mean 0.085 and q99 0.502, while SFR CEM executed actions averaged 0.708 with 18.5% saturation; current horizon 4/repeat 4 exposes only one independent control block
+- Decision/next action: pass remote regression, then screen a small predefined planner ladder on validation scenarios before any fresh confirmatory test
+
 ### 2026-09-15 10:32 - Phase 2 v2 three-seed attribution completed
 
 - Phase/purpose: complete the success-count-matched `D_SFN_balanced` versus `D_SFR_balanced` feasibility experiment and decide whether the observed gain is recovery-specific
