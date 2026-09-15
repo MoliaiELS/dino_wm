@@ -357,6 +357,20 @@ OOD 按以下顺序推进：
 - 三 seed、60 个 fresh scenarios 的 frozen-probe feasibility 已完成：temporal training 提升 recoverability decodability，但 `SFR-SFN` 的 progress、off-nominal、recoverability 配对置信区间均跨 0，严格 Gate C 未通过。
 - 因 recovery-specific representation signal 不成立，本轮不在已使用的 confirmatory test 上开发 visual planner；goal-set planning 与 visual closed-loop 仅能在重新设计的 validation task 出现信号后继续，并需要新的 fresh confirmatory pairs。
 
+### 9.1 Experiment B 下一轮最小改进方案
+
+当前失败应解释为“现有静态 frozen probes 没有检出 recovery-specific representation effect”，不能直接解释成视觉模型完全没有学习恢复动力学。下一轮继续保持小规模 feasibility 定位，按以下门控推进：
+
+1. **先分析、后重训。** 复用现有三个 checkpoints，在 validation split 上按 `reposition/recontact/corrective_push`、扰动类型和 severity 分层；比较 recovery-prefix 与普通成功帧，确认信号具体消失在哪个阶段。
+2. **把主要评价对齐到 action-conditioned 问题。** 从同一 post-perturbation visual state 输入 `F1/F2/R` 候选 action sequences，执行视觉 world-model rollout 并评价 recovery top-1、margin 和 regret。当前 progress/off-nominal/recoverability probes 降为辅助指标，因为恢复知识可能存在于 transition operator，而不在 zero-action 的静态 embedding 中。
+3. **检查表示提取瓶颈。** 首先直接 probe 全部 16 个 contextual spatial tokens，再比较 fixed attention pooling；不得一开始就解冻 DINO。当前 mean pooling 作为 B0 baseline 保留。
+4. **建立 hard probe。** Off-nominal negatives 应匹配 object pose、coverage 和 agent-object distance，避免只靠 agent 的显著位移分类；recoverability 同时报告 5/10/20-step 或 time-to-recovery，避免 5-step 标签只表示“已经接近成功”。
+5. **最小训练消融只用一个 seed 且只看 validation。** B0 为当前模型；B1 保留 spatial tokens；B2 增加 token-delta/change-weighted loss；B3 增加 5/10-step rollout；B4 再考虑 phase-balanced sampling。每次只改变一个因素。
+6. **保持归因控制。** 所有消融继续使用成功数量、轨迹数、窗口预算完全匹配的 `SFN`/`SFR`；simulator mask 或 oracle state 只能用于 loss weighting、标签和评价，不能作为视觉模型输入。
+7. **进入正式复验的条件。** validation 上必须同时出现 `SFR > SFN` 的 visual counterfactual ranking、recovery-prefix future prediction 改善，且 progress 不发生实质退化；同时保留 raw DINO 与 random adapter controls。
+8. **测试集纪律。** 配置锁定后生成新的 scenario seed/pairs，运行至少三个训练 seeds 和 seed × scenario crossed bootstrap。现有 seed-20260916 的 60 个场景已经用于 Phase 3 最终 probe，禁止继续用来选择 visual planner。
+9. **规划门。** 只有新的 Gate C 通过后，才实现 goal-set latent planning 和 visual closed-loop；goal set 必须覆盖多个成功终态，避免单张目标图像绑定无关 agent pose。
+
 ### Phase 4: OOD and final runs
 
 - 锁定配置后运行 OOD、多 seed、统计分析和最终图表。
@@ -406,11 +420,10 @@ next action
 
 ## 14. 文件与实现索引
 
-- `IMPLEMENTATION_OVERVIEW.md`：区分原始 DINO-WM、本项目新增模块和对原文件的必要修改，并记录代码调用关系、完成度与当前结论。
-- `Experiment_Report_Phase2.md`：Phase 0–2 的中文实验报告，包含配置、指标定义、图表、数据、局限和 Gate 判断。
-- `Experiment_Report_Recovery_Attribution_v2.md`：成功数量匹配的 SFN/SFR 小规模归因报告；区分 recovery-specific value 与“更多成功样本”。
-- `Experiment_Report_Phase3.md`：Experiment B 的 frozen-DINO temporal representation、三 seed probes、配对置信区间、Gate C 结论与后续决策。
-- `Progress.md`：实现、远端运行、失败、指标与实验决策的连续记录。
+- `IMPLEMENTATION_OVERVIEW.md`：区分原始 DINO-WM 与 `phase0/`–`phase3/` recovery 扩展，并记录当前代码调用关系和目录职责。
+- `Experiment_Report.md`：唯一最终实验报告，统一包含数据设计、Experiment A/B 设置、指标、图表、结论、局限与 Gate 判断。
+- `Progress.md`：实现、远端运行、失败、指标与实验决策的连续历史；不因报告合并而删除旧运行记录。
+- `report_assets/`：最终报告直接嵌入的轻量可视化；生成逻辑分别位于 `phase1/visualize_dataset.py`、`phase2/plot_*.py` 和 `phase3/plot_results.py`。
 
 ## 核心原则
 

@@ -21,7 +21,7 @@ cd ~/dino_wm
 source bash.sh
 
 run_dir="$DATASET_DIR/phase3_runs/$run_group/$variant/seed_$seed"
-python train_visual_wm.py \
+python -m phase3.train \
   --cache-dir "$DATASET_DIR/$cache_name" \
   --variant "$variant" \
   --seed "$seed" \

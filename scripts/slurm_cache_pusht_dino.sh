@@ -19,7 +19,7 @@ cd ~/dino_wm
 source bash.sh
 export SDL_VIDEODRIVER=dummy
 
-python cache_pusht_dino.py \
+python -m phase3.cache_dino \
   --source-dir "$DATASET_DIR/$source_name" \
   --output-dir "$DATASET_DIR/$cache_name" \
   "${extra_args[@]}"

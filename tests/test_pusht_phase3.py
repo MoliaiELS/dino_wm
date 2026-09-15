@@ -3,9 +3,9 @@ import json
 import numpy as np
 import torch
 
-from cache_pusht_dino import render_sim_state
+from phase3.cache_dino import render_sim_state
 from env.pusht.pusht_env import PushTEnv
-from evaluate_visual_probes import _fit_classifier, _fit_progress
+from phase3.evaluate_probes import _fit_classifier, _fit_progress
 from models.visual_temporal_model import VisualTemporalWorldModel
 from phase1.pusht_dataset import snapshot_to_vector
 from phase3.data import (

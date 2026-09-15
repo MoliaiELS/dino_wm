@@ -37,4 +37,4 @@ if [[ "$representation" == "trained_adapter" || "$representation" == "random_ada
   fi
   args+=(--checkpoint "$DATASET_DIR/phase3_runs/$run_group/$variant/seed_$seed/checkpoint_best.pt")
 fi
-python evaluate_visual_probes.py "${args[@]}"
+python -m phase3.evaluate_probes "${args[@]}"

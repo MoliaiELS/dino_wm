@@ -1,4 +1,4 @@
-from aggregate_visual_probes import aggregate
+from phase3.aggregate_probes import aggregate
 
 
 def _report(seed, recovery=False):

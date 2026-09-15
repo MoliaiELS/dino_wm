@@ -5,6 +5,15 @@
 
 ![teaser_figure](assets/intro.png)
 
+## Recovery experiment extension in this fork
+
+This fork keeps the original DINO-WM entrypoints intact and adds a separate
+PushT recovery-data study under `phase0/` through `phase3/`. The consolidated
+Chinese experiment report is [Experiment_Report.md](Experiment_Report.md), the
+original-versus-added code map is
+[IMPLEMENTATION_OVERVIEW.md](IMPLEMENTATION_OVERVIEW.md), and the next-run
+rules are in [AGENTS.md](AGENTS.md).
+
 # Getting Started
 
 1. [Installation](#installation)

@@ -24,14 +24,14 @@ source bash.sh
 export SDL_VIDEODRIVER=dummy
 
 output_dir="$DATASET_DIR/phase2_runs/$run_group/$variant/seed_$seed"
-python train_state_wm.py \
+python -m phase2.train \
   --dataset-dir "$DATASET_DIR/$dataset_name" \
   --variant "$variant" \
   --normalization-variant "$normalization_variant" \
   --seed "$seed" \
   --output-dir "$output_dir"
 
-python evaluate_state_wm.py \
+python -m phase2.evaluate_checkpoint \
   --dataset-dir "$DATASET_DIR/$dataset_name" \
   --checkpoint "$output_dir/checkpoint_best.pt" \
   --output "$output_dir/evaluation.json"

@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import torch
 
-from compare_state_wm import paired_bootstrap
+from phase2.compare import paired_bootstrap
 from models.state_world_model import StateWorldModel
 from phase2.data import (
     NormalizationStats,
@@ -20,7 +20,7 @@ from phase2.evaluation import (
     state_planning_cost,
     task_error,
 )
-from train_state_wm import _run_epoch
+from phase2.train import _run_epoch
 
 
 BRANCHES = ("S", "F1", "F2", "R")

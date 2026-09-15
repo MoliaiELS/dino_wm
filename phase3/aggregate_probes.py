@@ -9,7 +9,7 @@ from pathlib import Path
 
 import numpy as np
 
-from aggregate_state_wm import crossed_paired_bootstrap
+from phase2.aggregate import crossed_paired_bootstrap
 from phase2.evaluation import dump_json
 
 

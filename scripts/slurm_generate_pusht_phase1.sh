@@ -12,4 +12,4 @@ cd ~/dino_wm
 source bash.sh
 export SDL_VIDEODRIVER=dummy
 
-python generate_pusht_phase1.py "$@"
+python -m phase1.generate_dataset "$@"

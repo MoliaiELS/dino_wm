@@ -22,7 +22,7 @@ source bash.sh
 export SDL_VIDEODRIVER=dummy
 
 run_dir="$DATASET_DIR/phase2_runs/$run_group/$variant/seed_$seed"
-python evaluate_state_wm.py \
+python -m phase2.evaluate_checkpoint \
   --dataset-dir "$DATASET_DIR/$dataset_name" \
   --checkpoint "$run_dir/checkpoint_best.pt" \
   --output "$run_dir/$output_name"

@@ -2,7 +2,7 @@ import json
 
 import numpy as np
 
-from aggregate_state_wm import aggregate_run, crossed_paired_bootstrap
+from phase2.aggregate import aggregate_run, crossed_paired_bootstrap
 
 
 def _write(path, payload):

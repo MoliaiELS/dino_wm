@@ -158,6 +158,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-15 22:03 - End-of-day report and recovery-code consolidation
+
+- Phase/purpose: pause experimental expansion, consolidate authoritative results, separate recovery additions from the original DINO-WM root layout, and regenerate a more diagnostic dataset visualization
+- Git commit: pending this consolidation commit
+- Command/config: merge the Phase 2, recovery-attribution and Phase 3 reports into `Experiment_Report.md`; move experiment CLIs into `phase0/`–`phase3/`; update imports/tests/SLURM wrappers; select the most recovery-distinct representative per perturbation cell and render an S-branch-point-to-R storyboard plus N/R diagnostics
+- Dataset path/version: read-only `$DATASET_DIR/pusht_recovery_phase1_pilot_v2`; no dataset regeneration or mutation
+- Seeds: existing dataset base seed 20260914; no new training seed
+- SLURM job ID/node: not applicable; remote regression and visualization pending
+- Log/output path: planned `report_assets/phase1-s-versus-r-recovery-storyboard.png`, refreshed `phase1-six-cell-*.png`, final report `Experiment_Report.md`
+- Status: implementation complete locally; remote validation pending
+- Key metrics/error: no experimental metric has been changed. Old stage reports are removed only after their final settings, metrics, limitations and Gate decisions are consolidated. Historical execution records remain in this file.
+- Decision/next action: commit/push, run all PushT recovery regression tests remotely, regenerate visualizations from the authoritative v2 dataset, visually inspect them, then store only the lightweight PNG outputs in Git. Experiment B next-run plan is frozen in `AGENTS.md`.
+
 ### 2026-09-15 16:02 - Experiment B three-seed final probe aggregation
 
 - Phase/purpose: complete the fixed-budget SFN/SFR visual representation feasibility test and apply Gate C
@@ -751,6 +764,7 @@ Use the following template for every meaningful remote run:
 
 ### 2026-09-15
 
+- Consolidated the three stage reports into one authoritative `Experiment_Report.md`, reorganized recovery CLIs under phase-specific packages, and documented the next Experiment B diagnostics in `AGENTS.md`; remote verification is recorded in the run log.
 - Locked planner P3 using validation-only pooled absolute performance, generated 60 fresh balanced all-test scenarios, and confirmed both recovery ranking and closed-loop success across three training seeds; Experiment A feasibility Gate B now passes with a documented retention-loss limitation.
 - Completed the 200-pair schema-v2 dataset with success-matched nominal continuation `N`, action phases, R/N audits and six-cell visual diagnostics.
 - Completed three matched SFN/SFR training seeds and stratified evaluation on R and its reposition/recontact prefix.
