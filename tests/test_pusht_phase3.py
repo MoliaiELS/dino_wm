@@ -5,6 +5,7 @@ import torch
 
 from cache_pusht_dino import render_sim_state
 from env.pusht.pusht_env import PushTEnv
+from evaluate_visual_probes import _fit_classifier, _fit_progress
 from models.visual_temporal_model import VisualTemporalWorldModel
 from phase1.pusht_dataset import snapshot_to_vector
 from phase3.data import (
@@ -122,3 +123,24 @@ def test_sim_state_render_is_deterministic():
     second = render_sim_state(env, vector)
     assert first.shape == (96, 96, 3)
     assert np.array_equal(first, second)
+
+
+def test_probe_fitting_returns_sample_aligned_predictions():
+    features = np.asarray(
+        [[0.0, 0.0], [0.1, 0.2], [0.8, 0.9], [1.0, 1.0]], dtype=np.float32
+    )
+    payload = {
+        "features": features,
+        "coverage": np.asarray([0.0, 0.1, 0.9, 1.0]),
+        "off_nominal": np.asarray([0, 0, 1, 1]),
+        "off_nominal_mask": np.ones(4, dtype=bool),
+        "scenario_id": np.asarray(["a", "a", "b", "b"]),
+    }
+    progress = _fit_progress(payload, payload, payload, [0.1, 1.0])
+    classifier = _fit_classifier(
+        payload, payload, payload, "off_nominal", "off_nominal_mask", [0.1, 1.0]
+    )
+    assert len(progress["test_predictions"]) == 4
+    assert progress["test"]["r2"] > 0.8
+    assert len(classifier["test_probabilities"]) == 4
+    assert classifier["test"]["roc_auc"] == 1.0
