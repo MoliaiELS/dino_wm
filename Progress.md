@@ -144,6 +144,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-15 09:47 - Phase 1 v2 200-pair attribution dataset
+
+- Phase/purpose: generate the full small-pilot dataset containing the success-matched nominal continuation `N` for the SFN versus SFR attribution comparison
+- Git commit: generator `27a8323`; diagnostic updates `92aedca`; tracked figures `3f1d255`
+- Command/config: 200 scenarios, 224-pixel RGB, 50-step S, equal 35-step N/F1/F2/R branches, 21-state windows, videos and full audit enabled
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v2` (`pusht-recovery-pairs-v2`)
+- Seeds: data seed 20260914
+- SLURM job ID/node: `16212`, running on `4090node3`
+- Log/output path: `$DATASET_DIR/logs/p1-v2-data-16212.out`
+- Status: running
+- Key metrics/error: job started successfully after removing an incompatible explicit 8 GB memory request; first six scenarios completed with S/R success and F1 failure as expected
+- Decision/next action: wait for generation and audit completion; do not start SFN/SFR training until Gate A and R-versus-N distinctiveness are checked on all 200 pairs
+
 ### 2026-09-15 09:40 - Phase 1/2 recovery-specific attribution v2 implementation and smoke
 
 - Phase/purpose: distinguish recovery-specific dynamics coverage from the simpler explanation that SFR contains more successful examples
