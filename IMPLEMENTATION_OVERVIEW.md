@@ -135,11 +135,11 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 |---|---|---|
 | `models/state_world_model.py` | 编码 11 维 state 与二维 action，使用 causal ViT 预测 residual state update | 新增 state-only 模型；不经过 DINO |
 | `phase2/data.py` | 读取 paired dataset、构造无泄漏窗口、共享 normalization、按 branch 重采样 | 专用于 Experiment A |
-| `phase2/evaluation.py` | 多步误差、任务代价、counterfactual ranking、state-space CEM 与闭环评价 | 新增 recovery 专用评价 |
+| `phase2/evaluation.py` | 多步误差、任务代价、counterfactual ranking、state-space CEM 与闭环评价；支持 split 路由、动作范数上限、no-op acceptance、轨迹/退化/近目标速度代价与 retention diagnostics | 新增 recovery 专用评价 |
 | `train_state_wm.py` | StateWorldModel 训练、1-step + 5-step rollout loss、checkpoint 和日志 | 独立于原版 `train.py` |
 | `evaluate_state_wm.py` | 对 checkpoint 执行离线或闭环评价 | 独立于原版视觉 `plan.py` |
 | `compare_state_wm.py` | 对同 seed 的 SF/SFR 结果做 paired comparison 与 bootstrap | 新增统计入口 |
-| `aggregate_state_wm.py` | 汇总 3 seeds，并对 seed 与 scenario 交叉 bootstrap | 新增最终 pilot 汇总入口 |
+| `aggregate_state_wm.py` | 汇总 3 seeds，并对 seed 与 scenario 交叉 bootstrap；可选择 evaluation 文件并汇总 peak-to-final retention loss | 新增 pilot/confirmatory 汇总入口 |
 | `scripts/slurm_train_state_wm.sh` | 远端训练任务入口；可用 `PHASE2_DATASET_NAME` 选择 v1/v2 数据 | v1 已完成 seeds 0/1/2 |
 | `scripts/slurm_eval_state_wm.sh` | 远端评估任务入口；与训练共享显式数据版本 | v1 已完成离线及闭环评价 |
 | `scripts/slurm_eval_state_wm_offline.sh` | checkpoint 不变时重跑 branch/phase-stratified 离线评价 | v2 attribution 使用 |
@@ -156,6 +156,7 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 | `Experiment_Report_Recovery_Attribution_v2.md` | SFN/SFR 成功数量匹配归因实验，含分支级指标与六单元可视化 | 当前机制归因报告 |
 | `IMPLEMENTATION_OVERVIEW.md` | 本文件；代码边界、职责、调用关系和完成度索引 | 当前代码地图 |
 | `scripts/generate_phase2_report_assets.py` | 从远端权威 JSON/数据生成静态科学图表 | 可复现图表生成逻辑 |
+| `scripts/generate_recovery_confirmatory_assets.py` | 从三个 seed 的 fresh closed-loop JSON 生成 success/final/max/retention/action/coverage-trace 图 | P3 确认实验图表生成逻辑 |
 | `visualize_pusht_recovery_pairs.py` | 对齐展示六扰动单元的 N/R 帧与 agent/object 轨迹 | v2 smoke 已验证 |
 | `report_assets/*.png` | 数据审计、训练曲线、主结果、coverage dynamics 和分支 montage | 报告内嵌产物 |
 | `report_assets/phase1-v2-*.png` | v2 六单元 success-matched nominal 与 recovery 诊断 | 6-scenario smoke 产物 |
@@ -172,9 +173,11 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 
 - 全量 200-pair 数据集：`$DATASET_DIR/pusht_recovery_phase1_pilot_v1`。
 - success-matched 200-pair 数据集：`$DATASET_DIR/pusht_recovery_phase1_pilot_v2`。
+- 锁定 P3 后的新 60-pair all-test 数据集：`$DATASET_DIR/pusht_recovery_confirmatory_v2_seed20260916_60`。
 - Phase 2 checkpoints、训练日志、逐 scenario 评价 JSON。
 - 三-seed 汇总：`$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/three_seed_aggregate.json`。
 - v2 归因汇总：`$DATASET_DIR/phase2_runs/attribution_v2_65b750f/three_seed_attribution_aggregate.json`。
+- fresh confirmatory 汇总：`$DATASET_DIR/phase2_runs/attribution_v2_65b750f/confirmatory_seed20260916_60_aggregate.json`。
 
 远端数据盘是运行结果的权威来源；Git fixture 不能被当成完整训练集，`report_assets` 也不能替代原始 JSON。
 
@@ -204,19 +207,21 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 
 据此可以说：即使成功轨迹数量完全相同，recovery-rich data 仍改善 recovery-relevant dynamics prediction 和候选动作判断，并帮助 planner 到达更高 peak coverage。不能说：它已经稳定提高最终闭环成功率，也不能说 DINO 视觉 representation 已改善。
 
+在 validation-only 选择并锁定 P3 后，60 个全新场景进一步得到：recovery top-1 `0.661→0.994`；闭环 success `3/180→42/180`，配对提升 `+0.217 [0.039, 0.417]`；maximum coverage 提升 `+0.203 [0.070, 0.348]`。因此受控 Experiment A feasibility Gate B 已通过。与此同时，final coverage 的区间仍跨 0，retention loss 显著恶化 `+0.129 [0.062, 0.210]`，不能把结果解释成所有闭环质量指标均已解决。
+
 ## 9. 未完成项与已知技术债
 
 - Phase 2 checklist 中 additive variants 已被数据索引支持，但当前机制归因结果只针对固定预算、成功数量匹配的 SFN/SFR。
-- 当前 planner 曾用现有 test set 的前 5 个场景校准，故闭环数字属于 pilot evidence，而不是 untouched confirmatory test。
+- 原始 planner 曾用旧 test set 校准，故旧闭环数字只属于 pilot evidence；当前 P3 结果已通过 validation-only selection + fresh all-test set 修正这一问题。
 - SFR 经常先达到较高 coverage，随后丢失进展；需要 goal-retention、no-op/hold、acceptance safeguard 或 uncertainty-aware planning。
 - 当前 oracle 只验证 goal-aligned translation，以及 agent lateral/retreat 扰动；object displacement、rotation、新形状和真实机器人均未验证。
 - Experiment B 尚无 temporal DINO adapter、probe 或 visual closed-loop 结果。
 
 ## 10. 下一步建议
 
-1. 只在 validation scenarios 上诊断 `max coverage -> final coverage` 的退化，并修改 planner 的保持/停止机制。
-2. 锁定 planner 配置后，生成新的 confirmatory test pairs，重新运行至少三个 seeds。
-3. 只有 recovery ranking 与最终闭环表现同时形成可信改善，才通过 Gate B。
-4. Gate B 通过后，再实现 frozen DINO tokens → temporal adapter/predictor → contextual representation，并进入 Experiment B。
+1. 冻结 Experiment A 的 P3 和 fresh confirmatory 结果，不再在该 test set 上调 planner。
+2. 开始最小 Experiment B：frozen DINO tokens → temporal adapter/predictor → contextual representation，并先实现 raw DINO、random adapter 和 oracle-state controls。
+3. 把 goal retention 作为独立失败模式继续报告；若再次修改 planner，只能在 validation 上开发并另建 fresh test。
+4. 暂不扩展 object rotation、OOD 或真实机器人，直到视觉 feasibility signal 与现有 state-space upper/reference comparison 对齐。
 
 原始 Phase 2 设置见 `Experiment_Report_Phase2.md`；成功数量匹配的机制归因、分支指标和六单元可视化见 `Experiment_Report_Recovery_Attribution_v2.md`；逐次实现和远端作业历史见 `Progress.md`。

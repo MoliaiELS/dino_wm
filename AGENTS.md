@@ -346,11 +346,14 @@ OOD 按以下顺序推进：
 - 完成 state dynamics baselines 和三套数据对比。
 - 先验证 fixed-budget `SFR > SF`。
 - 如果 action ranking 与闭环恢复均无可信改进，先修正数据与建模，不进入大规模视觉实验。
+- 当前成功数量匹配的 `SFN`/`SFR` 小规模比较已经完成；P3 仅在 validation 上选择并锁定，随后在 seed 20260916 的 60 个 fresh all-test scenarios 上确认。
+- Fresh test 的 recovery ranking 与闭环 success 均形成跨 seed 的正向置信区间，因此受控 translation feasibility Gate B 已通过；但 final coverage 仍不确定且 retention loss 变差，后续不得省略该失败模式。
 
 ### Phase 3: Experiment B
 
 - 实现 visual temporal representation 和 frozen probes。
 - 与 raw DINO、random adapter 和 oracle upper bound 比较。
+- 以锁定 P3 的 state-space 结果作为 control reference；不得继续在现有 confirmatory test 上修改 planner。
 
 ### Phase 4: OOD and final runs
 

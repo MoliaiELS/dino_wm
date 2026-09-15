@@ -1,8 +1,10 @@
 # DINO-WM Recovery Dynamics 仿真实验报告
 
+> **历史基线说明（2026-09-15 更新）：** 本文件保留最初 `D_SF_balanced`/`D_SFR_balanced` Phase 2 pilot，不应作为当前最终结论。成功数量匹配的 `SFN`/`SFR` 归因实验、validation-only P3 选择及 fresh 60 场景确认结果见 [Experiment_Report_Recovery_Attribution_v2.md](Experiment_Report_Recovery_Attribution_v2.md)；后者已使受控 Experiment A feasibility Gate B 通过，同时保留 goal-retention 局限。
+
 **报告范围：** Phase 0–Phase 2，重点报告 Experiment A：Oracle-State Recovery Dynamics  
 **实验日期：** 2026-09-14  
-**实验状态：** 三个训练随机种子已完成；Gate A 通过，Gate B 暂未通过  
+**实验状态：** 历史 v1 pilot；当时 Gate A 通过、Gate B 暂未通过
 **主要代码版本：** 数据生成 `a976e2c`；校正训练 `cd99a24`；跨 seed 汇总 `a4fd07d`
 
 ## 摘要

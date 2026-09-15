@@ -5,7 +5,7 @@ Last updated: 2026-09-15
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: the v2 three-seed success-matched attribution pilot is complete; recovery-specific prediction/ranking and peak-coverage signals are positive, but final closed-loop success remains unresolved and Gate B is not passed
+- Overall status: the success-matched Experiment A feasibility result now reproduces on 60 fresh scenarios; recovery-specific prediction/ranking and closed-loop success improve across three seeds, so Gate B passes with an explicit unresolved goal-retention limitation
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -24,6 +24,7 @@ Last updated: 2026-09-15
 - [x] Identify success-count imbalance as a mechanism-level confound in the original SF/SFR comparison.
 - [x] Add an on-manifold nominal continuation `N` and `D_SFN_balanced` success-matched control.
 - [x] Complete the three-seed `D_SFN_balanced` versus `D_SFR_balanced` recovery-specific attribution pilot.
+- [x] Lock P3 on validation only and confirm the Experiment A result on 60 newly generated all-test scenarios.
 
 ## Environment audit
 
@@ -104,6 +105,7 @@ Last updated: 2026-09-15
 - [x] Run the success-matched SFN/SFR attribution comparison across seeds 0/1/2.
 - [x] Aggregate R-branch and reposition/recontact-prefix prediction separately from mixed branch prediction.
 - [x] Re-apply Gate B after attribution: recovery-specific dynamics signal passed, but end-to-end Gate B remains not passed because success-rate and final-coverage intervals cross zero.
+- [x] Re-apply Gate B on the fresh confirmatory set: passed for the controlled feasibility claim; closed-loop success improves from 3/180 to 42/180 with paired 95% CI excluding zero.
 
 ### Phase 3 - Experiment B
 
@@ -133,7 +135,8 @@ Last updated: 2026-09-15
 - Long-horizon CEM can exploit state-model error: one seed produced predicted near-goal costs while real coverage stayed near the branch state. Formal closed-loop evaluation must use calibrated short-horizon feedback planning and report action/coverage traces.
 - Across three corrected seeds, recovery-rich models reach substantially higher peak coverage but often lose progress before the 35-step endpoint; success and final-coverage uncertainty still cross zero. Diagnose goal retention and replanning drift before changing the world-model claim.
 - The success-matched v2 comparison removes the “more successful trajectories” explanation for prediction/ranking improvements, but it does not remove planner exploitation or goal-retention failure as explanations for weak final success.
-- The current 30-scenario test set was used during planner calibration and must be treated as pilot evidence, not a final untouched test. Tune further planner changes only on validation scenarios, lock the configuration, and use fresh simulator-generated confirmatory test pairs.
+- The original 30-scenario test set was used during early planner calibration and remains pilot-only evidence. This leakage concern is addressed for the present claim by validation-only P3 selection followed by the fresh seed-20260916 all-test set; any future planner change requires another fresh test.
+- The locked-P3 fresh test passes the success criterion, but SFR retention loss is significantly worse; Experiment B must report this separately and must not reinterpret peak coverage as stable final-state control.
 
 ## Decision gates
 
@@ -156,15 +159,15 @@ Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is 
 ### 2026-09-15 12:10 - Fresh confirmatory dataset and locked-P3 evaluation
 
 - Phase/purpose: test the validation-selected P3 planner on simulator scenes that were not used for model training, planner selection or earlier pilot reporting
-- Git commit: dataset/evaluator `338634e`; result aggregation and plotting are in the following implementation commit
+- Git commit: dataset/evaluator `338634e`; result aggregation/plotting `6944a70` plus the following variable-length trace fix
 - Command/config: generate 60 `--all-test` scenarios with seed 20260916 and exactly 10 scenarios per perturbation type/severity cell; evaluate all SFN/SFR checkpoints with locked P3 (horizon 4, repeat 2, action norm cap 0.5, trajectory/progress/object-speed weights 0.5/1.0/0.5, minimum predicted improvement 0.005)
 - Dataset path/version: `$DATASET_DIR/pusht_recovery_confirmatory_v2_seed20260916_60`; checkpoints remain under `$DATASET_DIR/phase2_runs/attribution_v2_65b750f`
 - Seeds: new simulator base seed 20260916; training seeds 0/1/2
-- SLURM job ID/node: generation `16268` on `4090node3`; closed-loop seed 0 `16269/16270`, seed 1 `16271/16272`, seed 2 `16274/16275` on `4090node1`, all completed with exit code 0; mistyped variant attempt `16273` failed before evaluation and produced no result
-- Log/output path: `$DATASET_DIR/logs/cf60-*-<job>.out`; per-checkpoint result `confirmatory_p3_seed20260916_60.json`
-- Status: dataset and six closed-loop evaluations completed; crossed-bootstrap aggregation pending
-- Key metrics/error: Gate A passed with 60 test scenarios, 10 per cell, S/N/R success 1.0, F1/F2 success 0, exact branch/action/alignment errors 0. SFN success by seed is 0/60, 1/60, 2/60; SFR is 25/60, 12/60, 5/60. Mean final coverage by seed is SFN 0.385/0.555/0.483 versus SFR 0.667/0.495/0.483. SFR reaches substantially higher maximum coverage in all seeds but has larger peak-to-final retention loss in every seed; no evaluated action exceeds the 0.5 norm cap.
-- Decision/next action: aggregate paired scenario/seed uncertainty without changing P3; add retention loss to the formal aggregate and render the confirmatory result figure before updating Gate B
+- SLURM job ID/node: generation `16268` on `4090node3`; closed-loop seed 0 `16269/16270`, seed 1 `16271/16272`, seed 2 `16274/16275`; fresh offline seed 0 `16276/16277`, seed 1 `16278/16279`, seed 2 `16280/16281`, all completed on 4090 nodes with exit code 0. Mistyped variant attempt `16273` failed before evaluation and produced no result; four initial offline submissions were rejected by the two-job QoS submit limit and were resubmitted sequentially.
+- Log/output path: `$DATASET_DIR/logs/cf60-*-<job>.out`; per-checkpoint results `confirmatory_p3_seed20260916_60.json` and `confirmatory_offline_seed20260916_60.json`; aggregate `confirmatory_seed20260916_60_aggregate.json`
+- Status: completed
+- Key metrics/error: Gate A passed with 60 test scenarios, 10 per cell, S/N/R success 1.0, F1/F2 success 0, exact branch/action/alignment errors 0. Fresh recovery top-1 is SFN 0.661 versus SFR 0.994, paired delta +0.333 [0.211, 0.461]. Recovery-prefix 20-step object-goal RMSE is 15.924 versus 3.927 px. Closed-loop success is 3/180 versus 42/180, delta +0.217 [0.039, 0.417]; maximum coverage delta +0.203 [0.070, 0.348]; action cost delta -4.838 [-6.639, -2.989]. Final coverage delta +0.074 [-0.103, 0.278] remains uncertain, while retention-loss delta +0.129 [0.062, 0.210] is significantly worse for SFR. No evaluated action exceeds the 0.5 norm cap. Aggregation regression passed 2 tests remotely; the first figure render found and then fixed variable-length traces caused by early success termination.
+- Decision/next action: Gate B passes for the controlled Experiment A feasibility claim because independent recovery ranking and closed-loop success both improve on fresh scenarios. Preserve the retention limitation, freeze this result, and begin only a small Experiment B implementation rather than enlarging the claim to OOD or real robotics.
 
 ### 2026-09-15 11:24 - Phase 2 validation planner selection locked
 
@@ -694,6 +697,7 @@ Use the following template for every meaningful remote run:
 
 ### 2026-09-15
 
+- Locked planner P3 using validation-only pooled absolute performance, generated 60 fresh balanced all-test scenarios, and confirmed both recovery ranking and closed-loop success across three training seeds; Experiment A feasibility Gate B now passes with a documented retention-loss limitation.
 - Completed the 200-pair schema-v2 dataset with success-matched nominal continuation `N`, action phases, R/N audits and six-cell visual diagnostics.
 - Completed three matched SFN/SFR training seeds and stratified evaluation on R and its reposition/recontact prefix.
 - Added stratified multi-seed aggregation and recorded the recovery-specific attribution result.

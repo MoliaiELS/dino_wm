@@ -119,13 +119,17 @@ def main():
         (baseline, "SFN", BLUE),
         (recovery, "SFR", ORANGE),
     ):
-        traces = np.asarray(
+        raw_traces = [
+            np.asarray(row["coverage_trace"], dtype=np.float64)
+            for report in reports
+            for row in report["per_scenario"]
+        ]
+        max_length = max(len(trace) for trace in raw_traces)
+        traces = np.stack(
             [
-                row["coverage_trace"]
-                for report in reports
-                for row in report["per_scenario"]
-            ],
-            dtype=np.float64,
+                np.pad(trace, (0, max_length - len(trace)), mode="edge")
+                for trace in raw_traces
+            ]
         )
         steps = np.arange(traces.shape[1])
         trace_ax.plot(steps, traces.mean(axis=0), color=color, label=label)

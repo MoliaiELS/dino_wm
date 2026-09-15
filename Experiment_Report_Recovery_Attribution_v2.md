@@ -3,7 +3,7 @@
 **实验日期：** 2026-09-15
 **研究阶段：** Phase 2 / Experiment A 归因补充实验
 **核心比较：** `D_SFN_balanced` 与 `D_SFR_balanced`
-**性质：** 三训练种子的 feasibility pilot，不是最终 confirmatory experiment
+**性质：** 三训练种子的 feasibility pilot，并包含锁定 planner 后的独立 60 场景确认实验
 
 ## 1. 实验目的与结论摘要
 
@@ -18,7 +18,7 @@ SFR = S + F1 + R   # recovery 组：R 从 post-perturbation state 恢复
 
 三训练种子结果表明：在排除成功样本数量差异后，`SFR` 仍显著改善 R 分支和恢复动作前缀的多步预测，并稳定改善 counterfactual ranking。这支持 **recovery-specific data 对恢复动力学学习有额外价值**，而不只是增加成功样本。
 
-但闭环最终成功率没有提升，final coverage 的区间也跨 0。因此当前只能确认动力学与候选动作判断信号，**不能宣称恢复数据已经稳定提高任务完成率，Gate B 仍未通过**。
+原始 30 场景闭环 pilot 没有提高最终成功率。随后我们只在 validation split 上修复并锁定 planner，再生成全新的 60 个确认场景。确认实验中闭环成功率由 `3/180` 提升到 `42/180`，配对提升的 95% CI 不跨 0；因此 **Experiment A 的小规模 feasibility Gate B 已通过**。不过 final coverage 的区间仍跨 0，且 SFR 的 peak-to-final retention loss 更大，说明“到达目标后稳定保持”仍是明确局限。
 
 ## 2. 轨迹设计
 
@@ -133,7 +133,7 @@ validation loss 不宜直接跨组解释，因为 N 与 R 的验证目标难度�
 
 闭环使用 state-space CEM：预测 horizon 4、action repeat 4、256 candidates、top-k 32、4 iterations、action cost weight 0.01、smoothness weight 0、staging weight 1.0。
 
-## 7. 三种子结果
+## 7. 原始 30 场景 pilot 的三种子结果
 
 ### 7.1 Recovery-specific 多步预测
 
@@ -169,7 +169,7 @@ top-1 的逐 seed 结果为：SFN `0.800/0.767/0.867`，SFR `1.000/1.000/1.000`�
 
 SFR planner 更经常到达较高 coverage，且用更少动作；但它没有稳定保持进展到 episode 结束，也没有提高 95% success。seed 0 的 final coverage 增益较大，seed 1/2 略为负，说明 final-state 结论对训练随机性敏感。
 
-## 8. 结论与研究判断
+## 8. 原始 pilot 阶段的结论与研究判断
 
 ### 可以支持
 
@@ -185,11 +185,11 @@ SFR planner 更经常到达较高 coverage，且用更少动作；但它没有�
 3. 不能外推到物体位移、旋转、新形状或真实机器人。
 4. 不能把三 seed pilot 的区间当成高精度总体估计；尤其 seed bootstrap 只有三个独立训练 seeds。
 
-### Gate 判断
+### 当时的 Gate 判断
 
 Recovery-specific attribution 子问题通过：结果不再能仅由“更多成功数据”解释。严格 Gate B 仍不通过，因为最终闭环恢复成功没有形成可信提升；项目应继续停留在 Phase 2，而不是立即扩大到视觉 Experiment B。
 
-## 9. 下一步最小改进
+## 9. 原始 pilot 后制定的最小改进
 
 本研究仍是粗略 feasibility test，下一步不需要立刻增加大规模数据：
 
@@ -223,3 +223,89 @@ Closed-loop jobs:
 ```
 
 完整运行历史见 `Progress.md`；代码边界见 `IMPLEMENTATION_OVERVIEW.md`；原始 v1 pilot 结果保留在 `Experiment_Report_Phase2.md`，作为历史基线而不是本归因实验的替代。
+
+## 11. 锁定 P3 后的独立确认实验
+
+### 11.1 为什么需要第二次评估
+
+原始 30 个 test scenarios 曾参与早期 planner 诊断，因此只能作为 pilot evidence。改进过程严格分成三步：
+
+1. 只在原 v2 数据集的 30 个 validation scenarios 上比较预先定义的 P0–P3；
+2. 按 SFN/SFR 两组的 pooled absolute performance 选择 P3，而不是选择能放大组间差异的配置；
+3. 锁定 P3 后，以新 simulator seed `20260916` 生成 60 个全新 all-test scenarios，不再调整模型、planner 或阈值。
+
+新数据仍覆盖 `agent_lateral`/`agent_retreat` × low/medium/high 六个单元，每单元恰好 10 个场景。Gate A 审计通过：`S/N/R` 成功率为 1.0，`F1/F2` 为 0；branch state、action bounds 和时序对齐违规均为 0。
+
+### 11.2 P0 与锁定 P3 的具体区别
+
+| 设置 | 原 P0 | 锁定 P3 | 目的 |
+|---|---:|---:|---|
+| CEM horizon / action repeat | 4 / 4 | 4 / 2 | 在同一预测 horizon 内提供两个独立控制块 |
+| candidates / top-k / iterations | 256 / 32 / 4 | 相同 | 保持搜索预算不变 |
+| initial std | 0.50 | 0.25 | 减少远离训练动作分布的搜索 |
+| action norm cap | 无额外 cap | 0.50 | 与 R 训练动作的 q99≈0.502 对齐 |
+| action / smoothness cost | 0.01 / 0 | 0.02 / 0.01 | 抑制激进和高频动作 |
+| trajectory cost weight | 0 | 0.50 | 不只优化 horizon 末端状态 |
+| progress-regression weight | 0 | 1.00 | 惩罚预测轨迹中重新远离目标 |
+| near-goal object-speed weight | 0 | 0.50 | 减少接近目标时的高速穿越 |
+| minimum predicted improvement | 无 | 0.005 | 候选不优于 no-op 时拒绝动作 |
+
+P3 在 validation 上被锁定后，确认数据才生成。因而下述 60 场景结果不是 planner 调参集上的回报。
+
+### 11.3 全新场景上的离线动力学与动作排序
+
+| 指标 | SFN | SFR | 改善 | 95% CI |
+|---|---:|---:|---:|---:|
+| Recovery top-1 accuracy | 0.661 | 0.994 | +0.333 | [0.211, 0.461] |
+| Recovery margin | — | — | +0.229 | [0.117, 0.329] |
+| Selection regret reduction | — | — | +0.165 | [0.104, 0.228] |
+| R-only 20-step object-goal RMSE | 10.531 px | 2.950 px | −7.580 px | [−8.164, −7.010] |
+| Recovery-prefix 20-step object-goal RMSE | 15.924 px | 3.927 px | −11.997 px | [−13.237, −10.894] |
+| Recovery-prefix 20-step agent-object RMSE | 26.479 px | 2.795 px | −23.684 px | [−24.968, −22.136] |
+
+离线结果在新场景上复现，而且最大改善仍集中在 reposition/recontact 前缀。这进一步排除了旧 test set 偶然性以及“只多了成功轨迹”的解释。
+
+### 11.4 全新场景上的闭环结果
+
+每个训练 seed 对相同 60 个场景评估，共 180 个 rollout/condition。置信区间同时重采样三个训练 seed 和 60 个成对 scenario ID。
+
+| 指标 | SFN | SFR | 配对差值（SFR−SFN） | crossed bootstrap 95% CI |
+|---|---:|---:|---:|---:|
+| Success rate | 3/180 = 0.017 | 42/180 = 0.233 | +0.217 | [0.039, 0.417] |
+| Final coverage | 0.474 | 0.548 | +0.074 | [−0.103, 0.278] |
+| Maximum coverage | 0.555 | 0.758 | +0.203 | [0.070, 0.348] |
+| Retention loss（max−final，越低越好） | 0.081 | 0.210 | +0.129 | [0.062, 0.210] |
+| Action cost | 14.994 | 10.156 | −4.838 | [−6.639, −2.989] |
+
+![锁定 P3 的独立 60 场景确认结果](report_assets/recovery-confirmatory-p3.png)
+
+三个 seed 的 success 分别为：SFN `0/60、1/60、2/60`，SFR `25/60、12/60、5/60`。每个 seed 的方向都为正，因此成功率的 crossed-bootstrap 区间排除 0。SFR 同时在每个 seed 上达到更高 maximum coverage，并消耗更低 action cost。
+
+但 final coverage 的区间仍跨 0，且 retention loss 明确变差。这并不否定 success 提升：当前 evaluator 达到 0.95 即记为成功并结束，因此部分成功轨迹较短；对未成功或未及时终止的轨迹，模型仍可能在高 coverage 后继续推离目标。报告 success、final、maximum 和 retention 四项，正是为了不把这两种现象混在一起。
+
+### 11.5 更新后的结论与边界
+
+- **可以支持：** 在成功数量、数据预算、模型容量和训练设置相同的情况下，recovery-rich state data 显著改善新场景上的 recovery dynamics、动作排序和闭环 95% 成功率。就本受控 PushT translation feasibility 问题而言，Gate B 通过。
+- **仍需保留：** 只有三个训练 seeds；final coverage 不稳健；retention loss 变差；扰动仍限于 agent lateral/retreat；尚未评估 object-pose/rotation OOD、视觉表示或真实机器人。
+- **下一步：** 可以开始小规模 Experiment B 实现，但必须把 P3 固定为 state-space control reference，并把 goal retention 作为独立失败模式报告。若继续改 planner，改动只能在 validation 上进行，并需要另一批 fresh test，不能覆盖本确认结果。
+
+确认实验权威产物：
+
+```text
+Dataset:
+  $DATASET_DIR/pusht_recovery_confirmatory_v2_seed20260916_60
+
+Aggregate:
+  $DATASET_DIR/phase2_runs/attribution_v2_65b750f/
+  confirmatory_seed20260916_60_aggregate.json
+
+Closed-loop jobs:
+  seed 0: 16269 / 16270
+  seed 1: 16271 / 16272
+  seed 2: 16274 / 16275
+
+Fresh offline jobs:
+  seed 0: 16276 / 16277
+  seed 1: 16278 / 16279
+  seed 2: 16280 / 16281
+```
