@@ -112,9 +112,11 @@ Last updated: 2026-09-15
 - [x] Implement temporal dynamics adapter/context representation over frozen DINO tokens.
 - [x] Define representation extraction consistently across datasets.
 - [x] Implement progress, off-nominal and recoverability probes.
-- [~] Add raw DINO, random adapter and oracle-state baselines; seed-0 visual baselines are complete and the oracle probe is being corrected to a nonlinear shallow-MLP upper bound.
-- [ ] Implement goal-set latent planning objective.
-- [ ] Evaluate visual closed-loop recovery.
+- [x] Add raw DINO, random adapter and nonlinear oracle-state reference baselines.
+- [x] Run matched SFN/SFR temporal training and corrected frozen probes across seeds 0/1/2 on 60 fresh scenarios.
+- [x] Apply Gate C: not passed; all three paired confidence intervals cross zero and recovery-specific representation improvement is unsupported.
+- [-] Implement goal-set latent planning objective: intentionally deferred because Gate C failed; any future planner must be developed on validation and tested on newly generated fresh pairs.
+- [-] Evaluate visual closed-loop recovery: not run in this feasibility round to avoid post-hoc tuning on the consumed confirmatory test.
 
 ### Phase 4 - OOD and final evaluation
 
@@ -155,6 +157,19 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-15 16:02 - Experiment B three-seed final probe aggregation
+
+- Phase/purpose: complete the fixed-budget SFN/SFR visual representation feasibility test and apply Gate C
+- Git commit: visual cache/model `b9585d1`; probes `3f00f1f`; balanced labels/LSQR `10277f3`; oracle MLP `c3bca25`
+- Command/config: frozen DINOv2 ViT-S/14, 4x4 pooled patch tokens, three-action history, 754,436-parameter temporal adapter, 20 epochs, batch 128, AdamW lr 3e-4; ridge/logistic visual probes and a fixed 64-unit oracle-state MLP; crossed seed-by-scenario bootstrap with 20,000 samples
+- Dataset path/version: v2 cache `$DATASET_DIR/pusht_recovery_dino_cache_v2_4x4_b9585d1`; fresh cache `$DATASET_DIR/pusht_recovery_dino_cache_confirmatory_seed20260916_60_4x4_b9585d1`; run group `$DATASET_DIR/phase3_runs/visual_attribution_v1_3f00f1f`
+- Seeds: visual training/probes 0/1/2; fresh simulator scenarios seed 20260916
+- SLURM job ID/node: cache smoke/full/fresh `16300/16301/16302`; training smoke `16303`; formal seed 0 SFN/SFR `16304/16305`; invalid calibration `16306`; corrected seed-0 probes `16307`; oracle MLP `16308`; seed 1 SFN/SFR `16309/16310`; seed 2 SFN/SFR `16311/16312`; seed 1/2 probes `16313/16314`; all valid jobs completed on 4090 nodes with exit code 0
+- Log/output path: `$DATASET_DIR/logs/p3-*.out`; per-seed checkpoints/probes and `aggregate_probes_3seed.json` under the run group
+- Status: completed; Gate C failed without runtime blocker
+- Key metrics/error: raw DINO progress MAE 0.02828, off-nominal AUROC 1.000 and recoverability Brier 0.03624. Three-seed SFN/SFR means are progress MAE 0.03654/0.03814, off-nominal Brier 0.00222/0.00510 and recoverability Brier 0.02843/0.02602. Paired SFN-error minus SFR-error is progress -0.001595 CI [-0.004886, 0.001846], off-nominal -0.003544 CI [-0.009608, 0.000018], recoverability +0.001973 CI [-0.003433, 0.007737]. Oracle-state shallow MLP reaches progress MAE 0.00581 and recoverability Brier 0.01941. All corrected tests passed; no formal job failed.
+- Decision/next action: do not claim recovery-specific visual representation improvement and do not tune visual planning on this consumed fresh test. Preserve Experiment A as the positive dynamics result; redesign a harder validation-only recovery probe before any new fresh-pair visual planning experiment.
 
 ### 2026-09-15 15:42 - Experiment B seed-0 corrected probes and oracle-upper-bound repair
 

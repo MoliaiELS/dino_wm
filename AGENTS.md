@@ -354,6 +354,8 @@ OOD 按以下顺序推进：
 - 实现 visual temporal representation 和 frozen probes。
 - 与 raw DINO、random adapter 和 oracle upper bound 比较。
 - 以锁定 P3 的 state-space 结果作为 control reference；不得继续在现有 confirmatory test 上修改 planner。
+- 三 seed、60 个 fresh scenarios 的 frozen-probe feasibility 已完成：temporal training 提升 recoverability decodability，但 `SFR-SFN` 的 progress、off-nominal、recoverability 配对置信区间均跨 0，严格 Gate C 未通过。
+- 因 recovery-specific representation signal 不成立，本轮不在已使用的 confirmatory test 上开发 visual planner；goal-set planning 与 visual closed-loop 仅能在重新设计的 validation task 出现信号后继续，并需要新的 fresh confirmatory pairs。
 
 ### Phase 4: OOD and final runs
 
@@ -407,6 +409,7 @@ next action
 - `IMPLEMENTATION_OVERVIEW.md`：区分原始 DINO-WM、本项目新增模块和对原文件的必要修改，并记录代码调用关系、完成度与当前结论。
 - `Experiment_Report_Phase2.md`：Phase 0–2 的中文实验报告，包含配置、指标定义、图表、数据、局限和 Gate 判断。
 - `Experiment_Report_Recovery_Attribution_v2.md`：成功数量匹配的 SFN/SFR 小规模归因报告；区分 recovery-specific value 与“更多成功样本”。
+- `Experiment_Report_Phase3.md`：Experiment B 的 frozen-DINO temporal representation、三 seed probes、配对置信区间、Gate C 结论与后续决策。
 - `Progress.md`：实现、远端运行、失败、指标与实验决策的连续记录。
 
 ## 核心原则
