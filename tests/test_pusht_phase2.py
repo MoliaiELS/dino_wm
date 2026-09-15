@@ -48,11 +48,13 @@ def _write_phase2_fixture(root: Path):
             states[:, 5] = 1.0
             actions = np.full((5, 2), 0.1 * branch_number, dtype=np.float32)
             coverage = np.linspace(0.0, 1.0, 6, dtype=np.float32)
+            success = coverage >= 0.95
             np.savez_compressed(
                 scenario_dir / f"{branch}.npz",
                 oracle_state=states,
                 actions=actions,
                 coverage=coverage,
+                success=success,
             )
     for variant, branches in variants.items():
         for scenario_id, split in scenario_splits.items():
