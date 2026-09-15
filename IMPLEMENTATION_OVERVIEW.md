@@ -154,7 +154,9 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 | `Experiment_Report_Phase2.md` | 中文自包含实验报告，含设置、指标定义、结果、限制和 Gate 结论 | 当前 Phase 2 结果报告 |
 | `IMPLEMENTATION_OVERVIEW.md` | 本文件；代码边界、职责、调用关系和完成度索引 | 当前代码地图 |
 | `scripts/generate_phase2_report_assets.py` | 从远端权威 JSON/数据生成静态科学图表 | 可复现图表生成逻辑 |
+| `visualize_pusht_recovery_pairs.py` | 对齐展示六扰动单元的 N/R 帧与 agent/object 轨迹 | v2 smoke 已验证 |
 | `report_assets/*.png` | 数据审计、训练曲线、主结果、coverage dynamics 和分支 montage | 报告内嵌产物 |
+| `report_assets/phase1-v2-*.png` | v2 六单元 success-matched nominal 与 recovery 诊断 | 6-scenario smoke 产物 |
 
 ## 7. 数据、代码和生成产物应如何区分
 

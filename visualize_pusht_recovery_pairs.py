@@ -172,14 +172,21 @@ def trajectory_overlays(dataset_dir, output_dir, representatives):
         ax.set_ylabel("Simulator y [px]")
         ax.grid(alpha=0.2)
     handles, labels = axes.flat[0].get_legend_handles_labels()
-    fig.legend(handles, labels, loc="upper center", ncol=4, frameon=False)
+    fig.legend(
+        handles,
+        labels,
+        loc="upper center",
+        bbox_to_anchor=(0.5, 0.955),
+        ncol=4,
+        frameon=False,
+    )
     fig.suptitle(
         "Aligned N and R trajectories across perturbation cells",
         fontsize=14,
         fontweight="bold",
-        y=0.99,
+        y=0.995,
     )
-    fig.tight_layout(rect=(0, 0, 1, 0.93))
+    fig.tight_layout(rect=(0, 0, 1, 0.90))
     fig.savefig(
         output_dir / "phase1-six-cell-trajectory-overlays.png",
         dpi=180,

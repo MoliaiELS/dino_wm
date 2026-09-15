@@ -22,7 +22,7 @@ Last updated: 2026-09-14
 - [x] Probe learned temporal predictive representations rather than unchanged raw frozen DINO features.
 - [x] Maintain scenario-level train/validation/test splits to prevent branch leakage.
 - [x] Identify success-count imbalance as a mechanism-level confound in the original SF/SFR comparison.
-- [~] Add an on-manifold nominal continuation `N` and `D_SFN_balanced` success-matched control.
+- [x] Add an on-manifold nominal continuation `N` and `D_SFN_balanced` success-matched control.
 
 ## Environment audit
 
@@ -144,18 +144,18 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
-### 2026-09-15 - Phase 1/2 recovery-specific attribution v2 implementation
+### 2026-09-15 09:40 - Phase 1/2 recovery-specific attribution v2 implementation and smoke
 
 - Phase/purpose: distinguish recovery-specific dynamics coverage from the simpler explanation that SFR contains more successful examples
-- Git commit: pending
+- Git commit: implementation `27a8323`; visualization layout follow-up pending
 - Command/config: add equal-horizon nominal continuation `N`, `D_SFN_balanced`, action-phase labels, R-versus-N distinctiveness audit and six-cell visual diagnostics
-- Dataset path/version: planned smoke dataset under `$DATASET_DIR`; existing v1 pilot remains immutable
-- Seeds: planned small structural smoke seed 20260914; no training seed started yet
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_v2_smoke_27a8323`; existing v1 pilot remains immutable
+- Seeds: data seed 20260914; no training seed started yet
 - SLURM job ID/node: not applicable yet
-- Log/output path: `phase1/pusht_dataset.py`, `visualize_pusht_recovery_pairs.py`, Phase 1/2 tests and documentation
-- Status: running
-- Key metrics/error: implementation in progress; no v2 result is claimed yet
-- Decision/next action: remote regression, then generate 6–12 v2 scenarios and inspect R/N separation before any 200-pair generation or training
+- Log/output path: smoke `audit.json`; remote-generated figures copied to `report_assets/phase1-v2-six-cell-*.png`
+- Status: completed
+- Key metrics/error: remote Phase 1/2 regression passed 12 tests. Six-cell smoke Gate A passed with zero branch/snapshot/action/alignment violations; S/N/R success 1.0 and F1/F2 success 0.0. `D_SFN_balanced` and `D_SFR_balanced` both contain 12 success and 6 failure trajectories. Aligned R versus N has mean action RMSE 0.101 command units, agent-object RMSE 11.06 px, object-goal RMSE 11.90 px, and a mean 6.67-step recovery prefix (19.0% of the 35-step branch; range 4–9 steps).
+- Decision/next action: R is measurably distinct from N but the retreat-low recovery prefix remains short. The v2 structure is sufficient for this feasibility attribution test; generate the 200-pair v2 pilot under SLURM, then run one-seed SFN/SFR before deciding whether to expand.
 
 ### 2026-09-14 22:05 - 原始框架与 recovery 扩展代码整理
 
