@@ -1,11 +1,11 @@
 # DINO-WM FYP Progress
 
-Last updated: 2026-09-14
+Last updated: 2026-09-15
 
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: the original three-seed pilot is complete; a v2 small-scale attribution experiment is being implemented to separate recovery-specific value from the effect of adding more successful trajectories
+- Overall status: the v2 three-seed success-matched attribution pilot is complete; recovery-specific prediction/ranking and peak-coverage signals are positive, but final closed-loop success remains unresolved and Gate B is not passed
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -23,6 +23,7 @@ Last updated: 2026-09-14
 - [x] Maintain scenario-level train/validation/test splits to prevent branch leakage.
 - [x] Identify success-count imbalance as a mechanism-level confound in the original SF/SFR comparison.
 - [x] Add an on-manifold nominal continuation `N` and `D_SFN_balanced` success-matched control.
+- [x] Complete the three-seed `D_SFN_balanced` versus `D_SFR_balanced` recovery-specific attribution pilot.
 
 ## Environment audit
 
@@ -50,7 +51,9 @@ Last updated: 2026-09-14
   - actions: `(2000, 100, 2)`
   - sequence lengths: 2000 trajectories, all length 100
 - PushT Phase 1 pilot exists at `$DATASET_DIR/pusht_recovery_phase1_pilot_v1`.
-- Pilot size/content: 200 paired scenarios, 800 aligned MP4 branches, 21 MB total.
+- PushT success-matched attribution dataset exists at `$DATASET_DIR/pusht_recovery_phase1_pilot_v2`.
+- v1 size/content: 200 paired scenarios, 800 aligned MP4 branches, 21 MB total.
+- v2 size/content: 200 paired scenarios, 1,000 aligned MP4 branches, 26 MB total.
 - A single complete scenario plus full manifest/audit is tracked under `tests/fixtures/pusht_phase1_pilot_v1` for lightweight regression tests.
 
 ### PushT smoke probe
@@ -86,6 +89,8 @@ Last updated: 2026-09-14
 - [x] Generate 200 pilot paired scenarios.
 - [x] Audit branch-state equality, temporal alignment and perturbation-cell balance; Gate A passed.
 - [x] Estimate final sample size from pilot variance and impose a conservative six-cell design floor of 180 scenarios.
+- [x] Add `N`, action-phase labels, R/N distinctiveness audits and six-cell aligned visual diagnostics in schema v2.
+- [x] Generate and audit the 200-pair v2 dataset with equal SFN/SFR success counts and windows.
 
 ### Phase 2 - Experiment A
 
@@ -96,6 +101,9 @@ Last updated: 2026-09-14
 - [x] Measure closed-loop recovery success, coverage, steps and action cost across 3 pilot seeds.
 - [x] Run at least 3 pilot seeds.
 - [x] Apply Gate B after the three-seed pilot: not passed; remain in Phase 2 and repair the planner/model interface before Experiment B.
+- [x] Run the success-matched SFN/SFR attribution comparison across seeds 0/1/2.
+- [x] Aggregate R-branch and reposition/recontact-prefix prediction separately from mixed branch prediction.
+- [x] Re-apply Gate B after attribution: recovery-specific dynamics signal passed, but end-to-end Gate B remains not passed because success-rate and final-coverage intervals cross zero.
 
 ### Phase 3 - Experiment B
 
@@ -124,6 +132,7 @@ Last updated: 2026-09-14
 - Existing Hydra Submitit configs request H100 resources although the available cluster documentation primarily lists 4090/3090 nodes.
 - Long-horizon CEM can exploit state-model error: one seed produced predicted near-goal costs while real coverage stayed near the branch state. Formal closed-loop evaluation must use calibrated short-horizon feedback planning and report action/coverage traces.
 - Across three corrected seeds, recovery-rich models reach substantially higher peak coverage but often lose progress before the 35-step endpoint; success and final-coverage uncertainty still cross zero. Diagnose goal retention and replanning drift before changing the world-model claim.
+- The success-matched v2 comparison removes the “more successful trajectories” explanation for prediction/ranking improvements, but it does not remove planner exploitation or goal-retention failure as explanations for weak final success.
 - The current 30-scenario test set was used during planner calibration and must be treated as pilot evidence, not a final untouched test. Tune further planner changes only on validation scenarios, lock the configuration, and use fresh simulator-generated confirmatory test pairs.
 
 ## Decision gates
@@ -134,7 +143,7 @@ Proceed only if exact branch restoration, action validity, label balance and tem
 
 ### Gate B - Recovery dynamics signal
 
-Proceed to the full visual experiment only if `D_SFR_balanced` improves both counterfactual action ranking and closed-loop recovery over `D_SF_balanced`, with uncertainty reported.
+Proceed to the full visual experiment only if `D_SFR_balanced` improves both counterfactual action ranking and closed-loop recovery over the fixed-budget controls; use `D_SFN_balanced` as the primary success-count-matched attribution control, with uncertainty reported.
 
 ### Gate C - Representation claim
 
@@ -143,6 +152,19 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-15 10:32 - Phase 2 v2 three-seed attribution completed
+
+- Phase/purpose: complete the success-count-matched `D_SFN_balanced` versus `D_SFR_balanced` feasibility experiment and decide whether the observed gain is recovery-specific
+- Git commit: data/training `27a8323`; stratified evaluation `9631a08`; aggregation `17c9b25`
+- Command/config: 50 epochs, batch 128, shared `D_SF` train-only normalization, identical 580,587-parameter StateWorldModel, 1-step plus 5-step rollout loss; test prediction at 1/5/10/20 steps; closed-loop CEM horizon 4, repeat 4, 256 samples, top-k 32, 4 iterations
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v2` (`pusht-recovery-pairs-v2`); run group `$DATASET_DIR/phase2_runs/attribution_v2_65b750f`
+- Seeds: training seeds 0/1/2; paired evaluation on the same 30 scenario-disjoint test pairs per seed
+- SLURM job ID/node: training `16213/16214`, `16220/16221`, `16224/16225`; closed-loop `16218/16219`, `16231/16232`, `16236/16237`; seed-0 evaluation refresh `16246/16247` on `3090node1`; all completed with exit code 0
+- Log/output path: `$DATASET_DIR/logs/p2-v2-*.out`; aggregate `$DATASET_DIR/phase2_runs/attribution_v2_65b750f/three_seed_attribution_aggregate.json`
+- Status: completed
+- Key metrics/error: recovery top-1 is 0.811 for SFN versus 1.000 for SFR, paired delta +0.189 with crossed-bootstrap 95% CI [0.067, 0.333]. On R only, 20-step object-goal RMSE is 9.323 versus 3.252 px; on reposition/recontact starts it is 14.666 versus 4.532 px. Closed-loop maximum coverage is 0.469 versus 0.696, delta +0.227 [0.110, 0.361], and action cost is 31.831 versus 24.576, delta -7.255 [-13.472, -0.829]. Final coverage delta +0.081 [-0.106, 0.299] is uncertain and both conditions achieve only 1/90 successes. Relevant remote regression passes 12 tests; no retraining was required for the final aggregation refresh.
+- Decision/next action: the mechanism-level attribution signal passes—improvements cannot be reduced to extra successful trajectories—but strict Gate B remains not passed. Keep Phase 2, diagnose goal retention on validation scenarios, lock the planner, then use fresh confirmatory pairs before Experiment B.
 
 ### 2026-09-15 10:08 - Phase 2 v2 stratified offline result and closed-loop jobs
 
@@ -630,6 +652,13 @@ Use the following template for every meaningful remote run:
 ```
 
 ## Changelog
+
+### 2026-09-15
+
+- Completed the 200-pair schema-v2 dataset with success-matched nominal continuation `N`, action phases, R/N audits and six-cell visual diagnostics.
+- Completed three matched SFN/SFR training seeds and stratified evaluation on R and its reposition/recontact prefix.
+- Added stratified multi-seed aggregation and recorded the recovery-specific attribution result.
+- Added `Experiment_Report_Recovery_Attribution_v2.md`; strict Gate B remains not passed because final closed-loop success did not improve.
 
 ### 2026-09-14
 

@@ -1,7 +1,7 @@
 # DINO-WM Recovery 项目文件与代码索引
 
-**整理基线：** 原始 DINO-WM 框架提交 `5b12dea`  
-**当前实现：** 截至提交 `9ddd1e5` 的 Phase 0–2 扩展  
+**整理基线：** 原始 DINO-WM 框架提交 `5b12dea`
+**当前实现：** Phase 0–2 扩展与 schema-v2 success-matched attribution pilot
 **用途：** 说明哪些代码属于原始框架、哪些是本项目新增、哪些原文件因实验需要被修改，以及目前可以支持什么结论。
 
 ## 1. 一句话结论
@@ -13,7 +13,7 @@ PushT 仿真与严格快照
   -> S/N/F1/F2/R 配对数据
   -> oracle-state StateWorldModel
   -> 多步预测 / counterfactual ranking / 闭环 CEM
-  -> 三 seed 统计与实验报告
+  -> 三 seed 统计与 success-matched attribution 报告
 ```
 
 Phase 0、Phase 1 和 Experiment A 的三-seed pilot 已完成。恢复数据在离线动力学预测、恢复动作排序、闭环最大 coverage 和动作成本上表现出稳定优势，但最终成功率与 final coverage 的置信区间仍跨 0。因此 **Gate B 尚未通过，Experiment B 的 DINO 视觉表征模块还没有开始实现**。
@@ -26,7 +26,7 @@ Phase 0、Phase 1 和 Experiment A 的三-seed pilot 已完成。恢复数据在
 | 表征 | 冻结 DINO 图像特征 | 当前没有训练或比较 DINO 表征 | 尚未进入 Experiment B |
 | 时序模型 | VisualWorldModel + causal ViT | 新增 StateWorldModel，复用 causal ViT 的时序预测结构 | 已完成 |
 | 环境 | 原有 PushT、PointMaze 等接口 | 明确动作语义、完整快照、几何任务评价 | 已完成 |
-| 数据 | 原作者发布的任务轨迹 | v1 已生成 `S/F1/F2/R`；v2 增加成功匹配的 `N` | v2 小规模验证中 |
+| 数据 | 原作者发布的任务轨迹 | v1 已生成 `S/F1/F2/R`；v2 增加成功匹配的 `N` | v2 三-seed pilot 已完成 |
 | 规划 | 原有 CEM/GD/MPC | 增加物理边界裁剪；Experiment A 新增 state-space CEM 评价 | pilot 已完成 |
 | 统计 | 原框架训练/规划输出 | 多 seed、配对 bootstrap、跨 seed × scenario 汇总 | 已完成 |
 
@@ -42,7 +42,7 @@ Phase 0、Phase 1 和 Experiment A 的三-seed pilot 已完成。恢复数据在
 flowchart TD
     A[PushTEnv\n原环境上的必要增强] --> B[generate_pusht_phase1.py]
     O[phase1/pusht_oracle.py\n几何 oracle 与扰动] --> B
-    B --> D[S/F1/F2/R paired dataset\n远端权威数据]
+    B --> D[S/N/F1/F2/R paired dataset\n远端权威数据]
     D --> L[phase2/data.py\nsplit-safe windows 与 normalization]
     L --> T[train_state_wm.py]
     M[models/state_world_model.py\nstate/action tokens + causal ViT] --> T
@@ -52,7 +52,7 @@ flowchart TD
     E --> P[多步预测 / ranking / closed-loop]
     P --> S[compare_state_wm.py\n单 seed 配对比较]
     S --> G[aggregate_state_wm.py\n跨 seed × scenario 汇总]
-    G --> R[Experiment_Report_Phase2.md]
+    G --> R[Phase2 与 Recovery Attribution 报告]
 ```
 
 原始视觉路线仍然独立存在：
@@ -153,6 +153,7 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 | `AGENTS.md` | 本地编辑、Git 同步、远端执行以及实验有效性约束 | 工作规则 |
 | `Progress.md` | 每次实现、数据、作业、指标、失败和决策的时间记录 | 进展单一文字记录 |
 | `Experiment_Report_Phase2.md` | 中文自包含实验报告，含设置、指标定义、结果、限制和 Gate 结论 | 当前 Phase 2 结果报告 |
+| `Experiment_Report_Recovery_Attribution_v2.md` | SFN/SFR 成功数量匹配归因实验，含分支级指标与六单元可视化 | 当前机制归因报告 |
 | `IMPLEMENTATION_OVERVIEW.md` | 本文件；代码边界、职责、调用关系和完成度索引 | 当前代码地图 |
 | `scripts/generate_phase2_report_assets.py` | 从远端权威 JSON/数据生成静态科学图表 | 可复现图表生成逻辑 |
 | `visualize_pusht_recovery_pairs.py` | 对齐展示六扰动单元的 N/R 帧与 agent/object 轨迹 | v2 smoke 已验证 |
@@ -170,8 +171,10 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 ### 仅保存在远端数据盘
 
 - 全量 200-pair 数据集：`$DATASET_DIR/pusht_recovery_phase1_pilot_v1`。
+- success-matched 200-pair 数据集：`$DATASET_DIR/pusht_recovery_phase1_pilot_v2`。
 - Phase 2 checkpoints、训练日志、逐 scenario 评价 JSON。
 - 三-seed 汇总：`$DATASET_DIR/phase2_runs/fixed_common_rollout_cd99a24/three_seed_aggregate.json`。
+- v2 归因汇总：`$DATASET_DIR/phase2_runs/attribution_v2_65b750f/three_seed_attribution_aggregate.json`。
 
 远端数据盘是运行结果的权威来源；Git fixture 不能被当成完整训练集，`report_assets` 也不能替代原始 JSON。
 
@@ -183,26 +186,27 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 |---|---|---|
 | `D_SF_balanced` | `S + F1 + F2` | control；有成功、open-loop failure 和等预算 neutral failure |
 | `D_SFN_balanced` | `S + F1 + N` | success-matched control；成功数量与 SFR 相同，但第三条保持在 nominal manifold |
-| `D_SFR_balanced` | `S + F1 + R` | treatment；唯一变化是用 recovery continuation 替换 `F2` |
+| `D_SFR_balanced` | `S + F1 + R` | treatment；在 SFN/SFR 归因比较中，唯一数据类型变化是用 recovery continuation `R` 替换 nominal continuation `N` |
 
 两者使用相同场景、窗口预算、模型容量、训练轮数、optimizer、共享 `D_SF` train-only normalization 和 seeds `0/1/2`。
 
 关键结果：
 
-| 指标 | SF | SFR | 结论 |
+| 指标 | SFN | SFR | 结论 |
 |---|---:|---:|---|
-| Recovery top-1 accuracy | 0.800 | 0.989 | `+0.189`，95% CI `[0.056, 0.367]`，稳定改善 |
-| 20-step object-goal RMSE | 5.255 px | 2.589 px | 三个 seeds 均改善 |
-| 闭环 maximum coverage | 0.488 | 0.721 | `+0.234`，95% CI `[0.135, 0.340]` |
-| 闭环 action cost | 28.55 | 23.11 | 差值 `-5.44`，95% CI `[-9.41, -1.76]` |
-| 闭环 final coverage | 0.388 | 0.495 | `+0.107`，95% CI `[-0.054, 0.254]`，未形成稳健证据 |
-| 闭环 success | 2/90 | 5/90 | 差值区间跨 0，未形成稳健证据 |
+| Recovery top-1 accuracy | 0.811 | 1.000 | `+0.189`，95% CI `[0.067, 0.333]`，成功数量匹配后仍稳定改善 |
+| R-only 20-step object-goal RMSE | 9.323 px | 3.252 px | 三个 seeds 均改善，降低 6.071 px |
+| Recovery-prefix 20-step agent-object RMSE | 23.507 px | 2.556 px | 最大改善出现在 reposition/recontact 状态 |
+| 闭环 maximum coverage | 0.469 | 0.696 | `+0.227`，95% CI `[0.110, 0.361]` |
+| 闭环 action cost | 31.831 | 24.576 | 差值 `-7.255`，95% CI `[-13.472, -0.829]` |
+| 闭环 final coverage | 0.384 | 0.465 | `+0.081`，95% CI `[-0.106, 0.299]`，未形成稳健证据 |
+| 闭环 success | 1/90 | 1/90 | 没有改善 |
 
-据此可以说：recovery-rich data 改善了 recovery-relevant dynamics prediction 和候选动作判断，并帮助 planner 到达更高 peak coverage。不能说：它已经稳定提高最终闭环成功率，也不能说 DINO 视觉 representation 已改善。
+据此可以说：即使成功轨迹数量完全相同，recovery-rich data 仍改善 recovery-relevant dynamics prediction 和候选动作判断，并帮助 planner 到达更高 peak coverage。不能说：它已经稳定提高最终闭环成功率，也不能说 DINO 视觉 representation 已改善。
 
 ## 9. 未完成项与已知技术债
 
-- Phase 2 checklist 中所有 additive variants 已被数据索引支持，但尚未完成与主对照同规格的多-seed corrected training；当前正式结果只针对 fixed-budget SF/SFR。
+- Phase 2 checklist 中 additive variants 已被数据索引支持，但当前机制归因结果只针对固定预算、成功数量匹配的 SFN/SFR。
 - 当前 planner 曾用现有 test set 的前 5 个场景校准，故闭环数字属于 pilot evidence，而不是 untouched confirmatory test。
 - SFR 经常先达到较高 coverage，随后丢失进展；需要 goal-retention、no-op/hold、acceptance safeguard 或 uncertainty-aware planning。
 - 当前 oracle 只验证 goal-aligned translation，以及 agent lateral/retreat 扰动；object displacement、rotation、新形状和真实机器人均未验证。
@@ -215,4 +219,4 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 3. 只有 recovery ranking 与最终闭环表现同时形成可信改善，才通过 Gate B。
 4. Gate B 通过后，再实现 frozen DINO tokens → temporal adapter/predictor → contextual representation，并进入 Experiment B。
 
-更完整的实验设置、每个指标定义、图表和统计解释见 `Experiment_Report_Phase2.md`；逐次实现和远端作业历史见 `Progress.md`。
+原始 Phase 2 设置见 `Experiment_Report_Phase2.md`；成功数量匹配的机制归因、分支指标和六单元可视化见 `Experiment_Report_Recovery_Attribution_v2.md`；逐次实现和远端作业历史见 `Progress.md`。
