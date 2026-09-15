@@ -144,6 +144,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-15 09:53 - Phase 2 v2 one-seed SFN/SFR attribution training
+
+- Phase/purpose: test whether off-nominal recovery data adds value beyond an equal number of successful on-manifold nominal continuations
+- Git commit: training/data interface `27a8323`; dataset audit record `65b750f`
+- Command/config: `D_SFN_balanced` versus `D_SFR_balanced`, seed 0, shared `D_SF` train-only normalization, 50 epochs, batch 128, identical 580,587-parameter StateWorldModel and 1-step + 5-step rollout loss
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v2`
+- Seeds: training seed 0
+- SLURM job ID/node: `16213` SFN running on `3090node1`; `16214` SFR pending under `AssocMaxJobsLimit`
+- Log/output path: `$DATASET_DIR/logs/p2-v2-sfn-s0-16213.out`, `$DATASET_DIR/logs/p2-v2-sfr-s0-16214.out`; run group `$DATASET_DIR/phase2_runs/attribution_v2_65b750f`
+- Status: running
+- Key metrics/error: both jobs submitted; the cluster currently allows only one active job for the user, so SFR will start after SFN
+- Decision/next action: wait for both automatic offline evaluations; compare prediction and recovery ranking first, without tuning on the test split or launching more seeds
+
 ### 2026-09-15 09:47 - Phase 1 v2 200-pair attribution dataset
 
 - Phase/purpose: generate the full small-pilot dataset containing the success-matched nominal continuation `N` for the SFN versus SFR attribution comparison
