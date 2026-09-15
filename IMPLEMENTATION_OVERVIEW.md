@@ -10,7 +10,7 @@
 
 ```text
 PushT 仿真与严格快照
-  -> S/F1/F2/R 配对数据
+  -> S/N/F1/F2/R 配对数据
   -> oracle-state StateWorldModel
   -> 多步预测 / counterfactual ranking / 闭环 CEM
   -> 三 seed 统计与实验报告
@@ -26,7 +26,7 @@ Phase 0、Phase 1 和 Experiment A 的三-seed pilot 已完成。恢复数据在
 | 表征 | 冻结 DINO 图像特征 | 当前没有训练或比较 DINO 表征 | 尚未进入 Experiment B |
 | 时序模型 | VisualWorldModel + causal ViT | 新增 StateWorldModel，复用 causal ViT 的时序预测结构 | 已完成 |
 | 环境 | 原有 PushT、PointMaze 等接口 | 明确动作语义、完整快照、几何任务评价 | 已完成 |
-| 数据 | 原作者发布的任务轨迹 | 仿真生成严格配对的 `S/F1/F2/R` recovery 数据 | 已完成 200 pairs |
+| 数据 | 原作者发布的任务轨迹 | v1 已生成 `S/F1/F2/R`；v2 增加成功匹配的 `N` | v2 小规模验证中 |
 | 规划 | 原有 CEM/GD/MPC | 增加物理边界裁剪；Experiment A 新增 state-space CEM 评价 | pilot 已完成 |
 | 统计 | 原框架训练/规划输出 | 多 seed、配对 bootstrap、跨 seed × scenario 汇总 | 已完成 |
 
@@ -113,15 +113,16 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 |---|---|---|
 | `generate_pusht_phase1.py` | 数据生成 CLI；组织场景、分支、审计、manifest 和视频输出 | 已生成 200 pairs |
 | `phase1/pusht_oracle.py` | goal-aligned translation 的几何 oracle、restaging 和 recovery 控制 | 当前受控域通过；rotation 尚未覆盖 |
-| `phase1/pusht_dataset.py` | `S/F1/F2/R` 落盘、scenario-level split、variant/window index、结构审计 | Gate A 通过 |
+| `phase1/pusht_dataset.py` | `S/N/F1/F2/R` 落盘、scenario-level split、variant/window index、结构与 R/N 差异审计 | v1 Gate A 通过；v2 验证中 |
 | `phase1/README.md` | Phase 1 数据格式与使用说明 | 已完成 |
 | `scripts/slurm_generate_pusht_phase1.sh` | 远端 SLURM 数据生成入口 | job `16174` 完成 |
 | `tests/test_pusht_phase1.py` | 分支一致性、对齐、split 和 variant 回归测试 | 远端通过 |
 | `tests/fixtures/pusht_phase1_pilot_v1/` | 一个完整场景的轻量回归 fixture，含四分支 NPZ/MP4/快照 | 可本地阅读，不替代远端全量数据 |
 
-四个分支含义：
+五个分支含义：
 
 - `S`：原始初态上的 nominal oracle success。
+- `N`：从扰动前 snapshot 开始的等 horizon nominal success continuation，用于成功数量匹配。
 - `F1`：扰动后继续执行扰动前的 open-loop nominal actions。
 - `F2`：从相同扰动后快照执行零动作的等预算 failure/neutral continuation。
 - `R`：从同一快照重新规划并闭环恢复的 oracle continuation。
@@ -139,8 +140,8 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 | `evaluate_state_wm.py` | 对 checkpoint 执行离线或闭环评价 | 独立于原版视觉 `plan.py` |
 | `compare_state_wm.py` | 对同 seed 的 SF/SFR 结果做 paired comparison 与 bootstrap | 新增统计入口 |
 | `aggregate_state_wm.py` | 汇总 3 seeds，并对 seed 与 scenario 交叉 bootstrap | 新增最终 pilot 汇总入口 |
-| `scripts/slurm_train_state_wm.sh` | 远端训练任务入口 | 已完成 seeds 0/1/2 |
-| `scripts/slurm_eval_state_wm.sh` | 远端评估任务入口 | 已完成离线及闭环评价 |
+| `scripts/slurm_train_state_wm.sh` | 远端训练任务入口；可用 `PHASE2_DATASET_NAME` 选择 v1/v2 数据 | v1 已完成 seeds 0/1/2 |
+| `scripts/slurm_eval_state_wm.sh` | 远端评估任务入口；与训练共享显式数据版本 | v1 已完成离线及闭环评价 |
 | `tests/test_pusht_phase2.py` | loader、模型 rollout、评价和 planner 单元/集成回归 | 远端通过 |
 | `tests/test_aggregate_state_wm.py` | 跨 seed 聚合和置信区间测试 | 与 Phase 2 tests 合计 10 tests passed |
 
@@ -178,6 +179,7 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 | 配置 | 包含分支 | 作用 |
 |---|---|---|
 | `D_SF_balanced` | `S + F1 + F2` | control；有成功、open-loop failure 和等预算 neutral failure |
+| `D_SFN_balanced` | `S + F1 + N` | success-matched control；成功数量与 SFR 相同，但第三条保持在 nominal manifold |
 | `D_SFR_balanced` | `S + F1 + R` | treatment；唯一变化是用 recovery continuation 替换 `F2` |
 
 两者使用相同场景、窗口预算、模型容量、训练轮数、optimizer、共享 `D_SF` train-only normalization 和 seeds `0/1/2`。

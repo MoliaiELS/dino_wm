@@ -21,13 +21,15 @@ from env.pusht.pusht_env import PushTEnv
 from .pusht_oracle import GeometricPushTOracle, OracleConfig
 
 
-SCHEMA_VERSION = "pusht-recovery-pairs-v1"
-BRANCHES = ("S", "F1", "F2", "R")
+SCHEMA_VERSION = "pusht-recovery-pairs-v2"
+LEGACY_SCHEMA_VERSION = "pusht-recovery-pairs-v1"
+BRANCHES = ("S", "N", "F1", "F2", "R")
 VARIANTS = {
     "D_S": ("S",),
     "D_SF": ("S", "F1"),
     "D_SFR": ("S", "F1", "R"),
     "D_SF_balanced": ("S", "F1", "F2"),
+    "D_SFN_balanced": ("S", "F1", "N"),
     "D_SFR_balanced": ("S", "F1", "R"),
 }
 PERTURBATION_LEVELS = {
@@ -277,7 +279,34 @@ def rollout_from_snapshot(
     )
 
 
-def _trajectory_metadata(record, video_name):
+def _action_phase_labels(branch, record):
+    """Label action phases without leaking them into state-model inputs."""
+    labels = np.empty(record.action_count, dtype="<U24")
+    if branch in {"S", "N"}:
+        labels[:] = "nominal_push"
+    elif branch == "F1":
+        labels[:] = "open_loop_failure"
+    elif branch == "F2":
+        labels[:] = "neutral"
+    elif branch == "R":
+        labels[:] = "corrective_push"
+        contact_indices = np.flatnonzero(record.contacts)
+        if len(contact_indices):
+            first_contact = int(contact_indices[0])
+            labels[:first_contact] = "reposition"
+            labels[first_contact] = "recontact"
+        else:
+            labels[:] = "reposition"
+    else:
+        raise ValueError(f"Unknown branch {branch}")
+
+    if record.first_success_step is not None:
+        labels[record.first_success_step :] = "hold"
+    return labels
+
+
+def _trajectory_metadata(record, video_name, phase_labels):
+    contact_indices = np.flatnonzero(record.contacts)
     return {
         "action_count": record.action_count,
         "observation_count": int(record.rgb.shape[0]),
@@ -292,11 +321,16 @@ def _trajectory_metadata(record, video_name):
         "timeout": not bool(record.success.any()),
         "action_cost": float(np.linalg.norm(record.actions, axis=1).sum()),
         "contact_steps": int(np.count_nonzero(record.contacts)),
+        "first_contact_step": (
+            None if not len(contact_indices) else int(contact_indices[0])
+        ),
+        "phase_action_counts": dict(Counter(phase_labels.tolist())),
     }
 
 
 def save_trajectory(directory, branch, record, fps, save_video):
     directory.mkdir(parents=True, exist_ok=True)
+    phase_labels = _action_phase_labels(branch, record)
     np.savez_compressed(
         directory / f"{branch}.npz",
         actions=record.actions,
@@ -307,12 +341,13 @@ def save_trajectory(directory, branch, record, fps, save_video):
         coverage=record.coverage,
         success=record.success,
         contacts=record.contacts,
+        phase=phase_labels,
     )
     video_name = None
     if save_video:
         video_name = f"{branch}.mp4"
         imageio.mimsave(directory / video_name, record.rgb, fps=fps)
-    return _trajectory_metadata(record, video_name)
+    return _trajectory_metadata(record, video_name, phase_labels)
 
 
 class PushTPhase1Generator:
@@ -447,6 +482,12 @@ class PushTPhase1Generator:
             nominal.actions[branch_step:], self.config.branch_horizon
         )
         f2_actions = np.zeros((self.config.branch_horizon, 2), dtype=np.float64)
+        nominal_continuation = rollout_from_snapshot(
+            env,
+            pre_perturb_snapshot,
+            self.config.branch_horizon,
+            controller=self.oracle,
+        )
         f1 = rollout_from_snapshot(
             env, post_perturb_snapshot, self.config.branch_horizon, actions=f1_actions
         )
@@ -465,6 +506,7 @@ class PushTPhase1Generator:
         trajectory_metadata = {}
         for branch, record in {
             "S": nominal,
+            "N": nominal_continuation,
             "F1": f1,
             "F2": f2,
             "R": recovery,
@@ -498,6 +540,9 @@ class PushTPhase1Generator:
             "branch_step_in_nominal": branch_step,
             "branch_progress": branch_progress,
             "branch_state_sha256": branch_hash,
+            "nominal_continuation_state_sha256": hashlib.sha256(
+                nominal_continuation.sim_state[0].tobytes()
+            ).hexdigest(),
             "perturbation": {
                 "type": spec["perturbation_type"],
                 "severity": spec["severity"],
@@ -595,6 +640,7 @@ class PushTPhase1Generator:
             "sim_state_fields": list(SIM_STATE_FIELDS),
             "branch_semantics": {
                 "S": "closed-loop oracle nominal success trajectory",
+                "N": "equal-horizon on-manifold nominal success continuation",
                 "F1": "post-perturbation open-loop nominal continuation",
                 "F2": "post-perturbation equal-horizon neutral continuation",
                 "R": "post-perturbation closed-loop oracle replanning",
@@ -666,6 +712,15 @@ def _paired_statistics(values, bootstrap_samples, seed=0, target_effect=None):
 def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
     dataset_dir = Path(dataset_dir)
     manifest = _read_json(dataset_dir / "manifest.json")
+    schema_version = manifest.get("schema_version")
+    if schema_version not in {SCHEMA_VERSION, LEGACY_SCHEMA_VERSION}:
+        raise ValueError(f"Unsupported Phase 1 schema {schema_version}")
+    branches = tuple(manifest.get("branch_semantics", {}))
+    required_branches = {"S", "F1", "F2", "R"}
+    if not required_branches.issubset(branches):
+        raise ValueError(f"Manifest is missing required branches: {required_branches}")
+    if schema_version == SCHEMA_VERSION and "N" not in branches:
+        raise ValueError("Phase 1 v2 requires the nominal continuation branch N")
     errors = []
     warnings = []
     scenario_metrics = []
@@ -676,6 +731,8 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
     action_violations = 0
     temporal_violations = 0
     branch_state_max_error = 0.0
+    nominal_continuation_max_error = 0.0
+    distinctiveness_rows = []
 
     scenario_dirs = sorted((dataset_dir / "scenarios").glob("scenario_*"))
     if len(scenario_dirs) != manifest["scenario_count"]:
@@ -703,7 +760,7 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
         ] += 1
 
         records = {}
-        for branch in BRANCHES:
+        for branch in branches:
             npz_path = scenario_dir / f"{branch}.npz"
             if not npz_path.exists():
                 errors.append(f"Missing {npz_path}")
@@ -721,6 +778,10 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
             ) or len(record["contacts"]) != action_count:
                 temporal_violations += 1
                 errors.append(f"Temporal alignment failure in {scenario_id}/{branch}")
+            if schema_version == SCHEMA_VERSION:
+                if "phase" not in record or len(record["phase"]) != action_count:
+                    temporal_violations += 1
+                    errors.append(f"Action phase alignment failure in {scenario_id}/{branch}")
             if not all(np.all(np.isfinite(record[key])) for key in (
                 "actions", "proprio", "oracle_state", "legacy_state", "sim_state", "coverage"
             )):
@@ -738,7 +799,7 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
                         f"{frame_count} != {observation_count}"
                     )
 
-        if not all(branch in records for branch in BRANCHES):
+        if not all(branch in records for branch in branches):
             continue
         branch_initials = np.stack(
             [records[branch]["sim_state"][0] for branch in ("F1", "F2", "R")]
@@ -754,19 +815,67 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
         ):
             errors.append(f"Unequal counterfactual budget in {scenario_id}")
 
-        scenario_metrics.append(
-            {
-                "scenario_id": scenario_id,
-                "S_success": bool(records["S"]["success"][-1]),
-                "F1_success": bool(records["F1"]["success"][-1]),
-                "F2_success": bool(records["F2"]["success"][-1]),
-                "R_success": bool(records["R"]["success"][-1]),
-                "F1_coverage": float(records["F1"]["coverage"][-1]),
-                "F2_coverage": float(records["F2"]["coverage"][-1]),
-                "R_coverage": float(records["R"]["coverage"][-1]),
-                "R_recovery_steps": metadata["branches"]["R"]["first_success_step"],
-            }
-        )
+        if "N" in records:
+            if not (
+                len(records["N"]["actions"])
+                == len(records["F1"]["actions"])
+                == len(records["R"]["actions"])
+            ):
+                errors.append(f"Unequal success-matched budget in {scenario_id}")
+            branch_step = int(metadata["branch_step_in_nominal"])
+            nominal_error = float(
+                np.max(
+                    np.abs(
+                        records["N"]["sim_state"][0]
+                        - records["S"]["sim_state"][branch_step]
+                    )
+                )
+            )
+            nominal_continuation_max_error = max(
+                nominal_continuation_max_error, nominal_error
+            )
+            if nominal_error != 0:
+                errors.append(f"Nominal continuation mismatch in {scenario_id}")
+
+            r_actions = records["R"]["actions"]
+            n_actions = records["N"]["actions"]
+            r_states = records["R"]["oracle_state"]
+            n_states = records["N"]["oracle_state"]
+            r_phases = records["R"].get("phase", np.asarray([], dtype="<U1"))
+            recovery_prefix_steps = int(
+                np.count_nonzero(
+                    np.isin(r_phases, ("reposition", "recontact"))
+                )
+            )
+            distinctiveness_rows.append(
+                {
+                    "scenario_id": scenario_id,
+                    "cell": (
+                        f"{metadata['perturbation']['type']}:"
+                        f"{metadata['perturbation']['severity']}"
+                    ),
+                    "action_rmse_command": float(
+                        np.sqrt(np.mean(np.square(r_actions - n_actions)))
+                    ),
+                    "agent_object_position_rmse_px": float(
+                        np.sqrt(np.mean(np.square(r_states[:, :2] - n_states[:, :2])))
+                    ),
+                    "object_goal_position_rmse_px": float(
+                        np.sqrt(np.mean(np.square(r_states[:, 2:4] - n_states[:, 2:4])))
+                    ),
+                    "recovery_prefix_steps": recovery_prefix_steps,
+                    "recovery_prefix_fraction": (
+                        recovery_prefix_steps / max(len(r_actions), 1)
+                    ),
+                }
+            )
+
+        row = {"scenario_id": scenario_id}
+        for branch in branches:
+            row[f"{branch}_success"] = bool(records[branch]["success"][-1])
+            row[f"{branch}_coverage"] = float(records[branch]["coverage"][-1])
+        row["R_recovery_steps"] = metadata["branches"]["R"]["first_success_step"]
+        scenario_metrics.append(row)
 
     if action_violations:
         errors.append(f"Found {action_violations} out-of-bounds action components")
@@ -804,12 +913,12 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
 
     if not scenario_metrics:
         errors.append("No complete scenarios were available for metrics")
-        rates = {key: 0.0 for key in ("S", "F1", "F2", "R")}
+        rates = {key: 0.0 for key in branches}
         coverage_effect = success_effect = _paired_statistics([], 0)
     else:
         rates = {
             branch: float(np.mean([row[f"{branch}_success"] for row in scenario_metrics]))
-            for branch in ("S", "F1", "F2", "R")
+            for branch in branches
         }
         coverage_effect = _paired_statistics(
             [row["R_coverage"] - row["F1_coverage"] for row in scenario_metrics],
@@ -825,21 +934,68 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
         )
         if rates["S"] < 0.95:
             errors.append(f"Nominal oracle success rate is too low: {rates['S']:.3f}")
+        if "N" in rates and rates["N"] < 0.95:
+            errors.append(
+                f"Nominal continuation success rate is too low: {rates['N']:.3f}"
+            )
+        if schema_version == SCHEMA_VERSION and rates["R"] < 0.95:
+            errors.append(f"Recovery success rate is too low: {rates['R']:.3f}")
         if coverage_effect["mean"] <= 0:
             warnings.append("Recovery did not improve mean final coverage over F1")
 
     variant_label_counts = {}
-    for variant, branches in manifest["variants"].items():
+    for variant, variant_branches in manifest["variants"].items():
         success_count = sum(
             int(row[f"{branch}_success"])
             for row in scenario_metrics
-            for branch in branches
+            for branch in variant_branches
         )
-        total_count = len(scenario_metrics) * len(branches)
+        total_count = len(scenario_metrics) * len(variant_branches)
         variant_label_counts[variant] = {
             "success": success_count,
             "failure": total_count - success_count,
             "total_trajectories": total_count,
+        }
+    if (
+        "D_SFN_balanced" in variant_label_counts
+        and "D_SFR_balanced" in variant_label_counts
+        and variant_label_counts["D_SFN_balanced"]["success"]
+        != variant_label_counts["D_SFR_balanced"]["success"]
+    ):
+        errors.append(
+            "Success-matched SFN and SFR variants have different success counts"
+        )
+
+    recovery_distinctiveness = None
+    if distinctiveness_rows:
+        metric_names = (
+            "action_rmse_command",
+            "agent_object_position_rmse_px",
+            "object_goal_position_rmse_px",
+            "recovery_prefix_steps",
+            "recovery_prefix_fraction",
+        )
+
+        def summarize(rows):
+            return {
+                metric: {
+                    "mean": float(np.mean([row[metric] for row in rows])),
+                    "min": float(np.min([row[metric] for row in rows])),
+                    "max": float(np.max([row[metric] for row in rows])),
+                }
+                for metric in metric_names
+            }
+
+        recovery_distinctiveness = {
+            "definition": "aligned R versus success-matched on-manifold N",
+            "overall": summarize(distinctiveness_rows),
+            "by_perturbation_cell": {
+                cell: summarize(
+                    [row for row in distinctiveness_rows if row["cell"] == cell]
+                )
+                for cell in sorted({row["cell"] for row in distinctiveness_rows})
+            },
+            "per_scenario": distinctiveness_rows,
         }
 
     observed_estimates = [
@@ -851,7 +1007,7 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
     recommended_scenarios = max(observed_estimates + [design_floor])
 
     audit = {
-        "schema_version": SCHEMA_VERSION,
+        "schema_version": schema_version,
         "audited_at_utc": datetime.now(timezone.utc).isoformat(),
         "scenario_count": len(scenario_metrics),
         "split_counts": dict(split_counts),
@@ -861,10 +1017,12 @@ def audit_dataset(dataset_dir, verify_videos=True, bootstrap_samples=5000):
         "variant_final_label_counts": variant_label_counts,
         "branch_final_success_rates": rates,
         "branch_state_max_abs_error": branch_state_max_error,
+        "nominal_continuation_max_abs_error": nominal_continuation_max_error,
         "action_bound_violations": action_violations,
         "temporal_alignment_violations": temporal_violations,
         "paired_recovery_minus_f1_final_coverage": coverage_effect,
         "paired_recovery_minus_f1_success": success_effect,
+        "recovery_vs_nominal_continuation": recovery_distinctiveness,
         "sample_size_recommendation": {
             "analysis_unit": "paired scenario",
             "two_sided_alpha": 0.05,

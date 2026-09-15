@@ -204,6 +204,7 @@ PushT 的 T 形物体存在旋转和接触动力学。Experiment A 不使用原�
 2. 在固定 progress/contact 阶段施加预定义扰动。
 3. 扰动结束后保存完整物理 snapshot。
 4. 从完全相同的 snapshot 分叉生成：
+   - `N`：从扰动前的 nominal snapshot 出发，按相同 horizon 继续成功，用作 success-count-matched on-manifold control；
    - `F1`：继续扰动前的 open-loop nominal plan；
    - `F2`：等预算的另一条 failure/neutral continuation；
    - `R`：oracle replanning recovery continuation。
@@ -223,19 +224,34 @@ D_SFR = S + F1 + R
 
 Fixed budget:
 D_SF_balanced  = S + F1 + F2
+D_SFN_balanced = S + F1 + N
 D_SFR_balanced = S + F1 + R
 ```
 
-固定预算对比是验证 recovery continuation 额外价值的主要证据；additive 对比反映实际增加 recovery 数据的工程收益。
+`D_SFN_balanced` 与 `D_SFR_balanced` 的轨迹数、成功轨迹数、branch horizon 和训练预算必须相同。两者的主要区别是第三条成功 continuation 来自 nominal manifold 还是 post-perturbation recovery states，因此它们是区分“更多成功数据”与“recovery-specific data”的主要归因对照。原 `D_SF_balanced` 继续作为失败/中性 continuation 基线；additive 对比反映实际增加 recovery 数据的工程收益。
 
 所有数据统计量只从对应训练 split 计算，不使用仓库中旧 PushT 数据的硬编码 normalization stats。
 
 ### 7.5 Split 与防泄漏
 
 - 在生成训练窗口之前，按 `scenario_id/pair_id` 划分 train/validation/test。
-- 同一个 counterfactual pair 的所有 `S/F1/F2/R` 分支必须属于同一 split。
+- 同一个 counterfactual pair 的所有 `S/N/F1/F2/R` 分支必须属于同一 split。
 - 初步使用 ID split；OOD split 独立保存，不能参与调参。
 - 保存数据生成配置、代码 commit 和随机种子，使数据集可以重建。
+
+### 7.6 小规模改进实验：Recovery-specific attribution
+
+本轮仍是 feasibility pilot，不扩大为通用 PushT 或真实机器人研究。按以下最小方案推进：
+
+1. 保留当前约 35% nominal progress 后施加 agent lateral/retreat 扰动的严格分叉设计；扰动 transition 继续作为外生事件排除在训练窗口之外。
+2. 每个 scenario 新增 `N`：从扰动前 snapshot 用同一 oracle 运行与 `R` 相同的 35-step horizon，形成成功数量和预算匹配的 on-manifold nominal continuation。
+3. 每条轨迹保存 action-level phase 标签；`R` 至少区分 `reposition`、`recontact`、`corrective_push` 和 `hold`。phase 仅用于审计、分层采样和评价，不作为 world-model 输入。
+4. 数据审计必须量化对齐的 `R` 与 `N` action RMSE、agent-object/object-goal state RMSE、recovery-prefix 步数和比例，并按六个 perturbation type × severity cells 分层报告。
+5. 可视化不能只使用一个 low-severity scenario；必须覆盖 lateral/retreat 的 low/medium/high 六个单元，并从 branch point 对齐比较 `N` 与 `R`。
+6. 首轮只生成 6–12 scenarios 做结构和差异 smoke test。确认 `N` 成功、快照一致、R/N 可区分且所有测试通过后，才生成新的 200-pair v2 pilot。
+7. 训练先跑一个 seed 的 `D_SFN_balanced` 与 `D_SFR_balanced` 小规模比较；只有 recovery-state 指标显示有意义差异，才扩展到至少三个 seeds。
+8. 主要归因判断为：若 `SFR > SFN` 于 held-out post-perturbation prediction、ranking 和 closed-loop recovery，则支持 recovery-specific value；若两者接近，则当前收益主要解释为成功数据增补。
+9. Planner 的 goal-retention/no-op/hold 等修改只能在 validation scenarios 上开发；锁定后必须使用 fresh confirmatory pairs，不再用旧 test set 调参。
 
 ## 8. Experiment A: Oracle-State Recovery Dynamics
 
@@ -261,7 +277,7 @@ D_SFR_balanced = S + F1 + R
 WM_SFR > WM_SF > WM_S
 ```
 
-最关键的统计检验是固定预算条件下 `WM_SFR_balanced > WM_SF_balanced`。
+原始 feasibility 检验是固定预算条件下 `WM_SFR_balanced > WM_SF_balanced`；新增的关键归因检验是成功数量匹配条件下 `WM_SFR_balanced > WM_SFN_balanced`。
 
 ## 9. Experiment B: Visual Recovery Representation
 

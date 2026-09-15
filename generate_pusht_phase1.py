@@ -15,7 +15,7 @@ def default_output_dir():
     dataset_root = os.environ.get("DATASET_DIR")
     if not dataset_root:
         raise RuntimeError("DATASET_DIR is not set; source bash.sh before running")
-    return Path(dataset_root) / "pusht_recovery_phase1_pilot_v1"
+    return Path(dataset_root) / "pusht_recovery_phase1_pilot_v2"
 
 
 def parse_args():

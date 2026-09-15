@@ -16,6 +16,7 @@ variant="${1:?dataset variant is required}"
 seed="${2:?training seed is required}"
 run_group="${3:-phase2_state_wm_v1}"
 normalization_variant="${4:-$variant}"
+dataset_name="${PHASE2_DATASET_NAME:-pusht_recovery_phase1_pilot_v1}"
 
 source ~/miniforge3/etc/profile.d/conda.sh
 cd ~/dino_wm
@@ -24,11 +25,13 @@ export SDL_VIDEODRIVER=dummy
 
 output_dir="$DATASET_DIR/phase2_runs/$run_group/$variant/seed_$seed"
 python train_state_wm.py \
+  --dataset-dir "$DATASET_DIR/$dataset_name" \
   --variant "$variant" \
   --normalization-variant "$normalization_variant" \
   --seed "$seed" \
   --output-dir "$output_dir"
 
 python evaluate_state_wm.py \
+  --dataset-dir "$DATASET_DIR/$dataset_name" \
   --checkpoint "$output_dir/checkpoint_best.pt" \
   --output "$output_dir/evaluation.json"

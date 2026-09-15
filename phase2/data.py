@@ -14,7 +14,10 @@ import torch
 from torch.utils.data import Dataset
 
 
-EXPECTED_SCHEMA = "pusht-recovery-pairs-v1"
+SUPPORTED_SCHEMAS = {
+    "pusht-recovery-pairs-v1",
+    "pusht-recovery-pairs-v2",
+}
 ORACLE_STATE_DIM = 11
 ACTION_DIM = 2
 # The controlled translation pilot has nearly constant angle dimensions in
@@ -82,9 +85,10 @@ class NormalizationStats:
 def load_manifest(dataset_dir):
     dataset_dir = Path(dataset_dir)
     manifest = _read_json(dataset_dir / "manifest.json")
-    if manifest.get("schema_version") != EXPECTED_SCHEMA:
+    if manifest.get("schema_version") not in SUPPORTED_SCHEMAS:
         raise ValueError(
-            f"Expected schema {EXPECTED_SCHEMA}, got {manifest.get('schema_version')}"
+            f"Expected one of {sorted(SUPPORTED_SCHEMAS)}, "
+            f"got {manifest.get('schema_version')}"
         )
     if not manifest.get("gate_a_pass", False):
         raise ValueError("Refusing to train from a dataset that has not passed Gate A")

@@ -92,6 +92,43 @@ def _write_phase2_fixture(root: Path):
         json.dump(manifest, file)
 
 
+def _upgrade_fixture_with_nominal_control(root: Path):
+    manifest_path = root / "manifest.json"
+    with open(manifest_path, encoding="utf-8") as file:
+        manifest = json.load(file)
+    manifest["schema_version"] = "pusht-recovery-pairs-v2"
+    manifest["variants"]["D_SFN_balanced"] = ["S", "F1", "N"]
+    manifest["window_indices"]["D_SFN_balanced"] = {}
+    for scenario_id in manifest["scenario_splits"]:
+        scenario_dir = root / "scenarios" / scenario_id
+        with np.load(scenario_dir / "R.npz") as record:
+            np.savez_compressed(
+                scenario_dir / "N.npz",
+                **{key: record[key] for key in record.files},
+            )
+    for split in ("train", "valid", "test"):
+        source_metadata = manifest["window_indices"]["D_SFR_balanced"][split]
+        source = root / source_metadata["path"]
+        target = root / "indices" / f"D_SFN_balanced_{split}.jsonl"
+        rows = []
+        with open(source, encoding="utf-8") as file:
+            for line in file:
+                row = json.loads(line)
+                if row["branch"] == "R":
+                    row["branch"] = "N"
+                rows.append(row)
+        with open(target, "w", encoding="utf-8") as file:
+            for row in rows:
+                file.write(json.dumps(row) + "\n")
+        manifest["window_indices"]["D_SFN_balanced"][split] = {
+            "path": str(target.relative_to(root)),
+            "count": len(rows),
+            "branches": ["S", "F1", "N"],
+        }
+    with open(manifest_path, "w", encoding="utf-8") as file:
+        json.dump(manifest, file)
+
+
 def test_phase2_loader_uses_manifest_windows_and_train_only_stats(tmp_path):
     dataset_dir = tmp_path / "paired"
     _write_phase2_fixture(dataset_dir)
@@ -122,6 +159,17 @@ def test_validation_loader_refuses_to_compute_its_own_stats(tmp_path):
     _write_phase2_fixture(dataset_dir)
     with pytest.raises(ValueError, match="training statistics"):
         PairedStateWindowDataset(dataset_dir, "D_SF_balanced", "valid")
+
+
+def test_loader_accepts_success_matched_v2_variant(tmp_path):
+    dataset_dir = tmp_path / "paired_v2"
+    _write_phase2_fixture(dataset_dir)
+    _upgrade_fixture_with_nominal_control(dataset_dir)
+    stats = compute_train_normalization(dataset_dir, "D_SFN_balanced")
+    train = PairedStateWindowDataset(
+        dataset_dir, "D_SFN_balanced", "train", stats=stats
+    )
+    assert set(train.branch_counts) == {"S", "F1", "N"}
 
 
 def test_state_world_model_is_cpu_safe_causal_and_rolls_out():

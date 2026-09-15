@@ -50,7 +50,7 @@ def test_micro_dataset_has_exact_pairs_splits_and_alignment(tmp_path):
         seed=1234,
         render_size=64,
         nominal_horizon=50,
-        branch_horizon=24,
+        branch_horizon=35,
         window_length=8,
         bootstrap_samples=200,
     )
@@ -61,6 +61,7 @@ def test_micro_dataset_has_exact_pairs_splits_and_alignment(tmp_path):
     assert audit["branch_state_max_abs_error"] == 0
     assert audit["action_bound_violations"] == 0
     assert audit["temporal_alignment_violations"] == 0
+    assert audit["nominal_continuation_max_abs_error"] == 0
     assert audit["perturbation_type_counts"] == {
         "agent_lateral": 3,
         "agent_retreat": 3,
@@ -68,6 +69,21 @@ def test_micro_dataset_has_exact_pairs_splits_and_alignment(tmp_path):
     assert audit["severity_counts"] == {"low": 2, "medium": 2, "high": 2}
     assert len(audit["perturbation_type_severity_counts"]) == 6
     assert set(audit["variant_final_label_counts"]) == set(VARIANTS)
+    assert (
+        audit["variant_final_label_counts"]["D_SFN_balanced"]["success"]
+        == audit["variant_final_label_counts"]["D_SFR_balanced"]["success"]
+    )
+    assert audit["recovery_vs_nominal_continuation"] is not None
+    assert set(
+        audit["recovery_vs_nominal_continuation"]["by_perturbation_cell"]
+    ) == {
+        "agent_lateral:low",
+        "agent_lateral:medium",
+        "agent_lateral:high",
+        "agent_retreat:low",
+        "agent_retreat:medium",
+        "agent_retreat:high",
+    }
     assert audit["sample_size_recommendation"]["design_floor_scenarios"] == 180
     assert set(manifest["scenario_splits"].values()) == {"train", "valid", "test"}
 
@@ -84,8 +100,19 @@ def test_micro_dataset_has_exact_pairs_splits_and_alignment(tmp_path):
                 initial_states.append(record["sim_state"][0])
                 assert len(record["oracle_state"]) == len(record["actions"]) + 1
                 assert len(record["coverage"]) == len(record["actions"]) + 1
+                assert len(record["phase"]) == len(record["actions"])
         np.testing.assert_array_equal(initial_states[0], initial_states[1])
         np.testing.assert_array_equal(initial_states[0], initial_states[2])
+        with np.load(scenario_dir / "S.npz") as success, np.load(
+            scenario_dir / "N.npz"
+        ) as nominal_continuation:
+            np.testing.assert_array_equal(
+                nominal_continuation["sim_state"][0],
+                success["sim_state"][metadata["branch_step_in_nominal"]],
+            )
+            assert len(nominal_continuation["phase"]) == len(
+                nominal_continuation["actions"]
+            )
 
     for variant, expected_branches in VARIANTS.items():
         for split, index_metadata in manifest["window_indices"][variant].items():
@@ -111,8 +138,9 @@ def test_checked_in_remote_pilot_fixture_is_self_consistent():
     assert manifest["git_commit"] == "a976e2c6f8cdee5c5470881f8703b7f68a642bc3"
     assert metadata["scenario_id"] == "scenario_000000"
 
+    fixture_branches = tuple(manifest["branch_semantics"])
     branch_initials = []
-    for branch in BRANCHES:
+    for branch in fixture_branches:
         assert (scenario_dir / f"{branch}.mp4").is_file()
         with np.load(scenario_dir / f"{branch}.npz") as record:
             assert len(record["oracle_state"]) == len(record["actions"]) + 1

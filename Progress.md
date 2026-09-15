@@ -5,7 +5,7 @@ Last updated: 2026-09-14
 ## Current status
 
 - Current phase: Phase 2 - Experiment A
-- Overall status: corrected three-seed pilot and Chinese experiment report are complete; recovery-rich data robustly improves offline dynamics/ranking and peak closed-loop progress, but not final success/coverage, so Gate B is not passed
+- Overall status: the original three-seed pilot is complete; a v2 small-scale attribution experiment is being implemented to separate recovery-specific value from the effect of adding more successful trajectories
 - Main task: PushT simulator-based recovery dynamics and visual representation experiments
 - Runtime authority: remote server `idac_sever`
 - Dataset authority: `/mnt/slurmfs-4090node3/user_data/yguo704/dino_wm_dataset`
@@ -21,6 +21,8 @@ Last updated: 2026-09-14
 - [x] Run Experiment A before committing substantial compute to Experiment B.
 - [x] Probe learned temporal predictive representations rather than unchanged raw frozen DINO features.
 - [x] Maintain scenario-level train/validation/test splits to prevent branch leakage.
+- [x] Identify success-count imbalance as a mechanism-level confound in the original SF/SFR comparison.
+- [~] Add an on-manifold nominal continuation `N` and `D_SFN_balanced` success-matched control.
 
 ## Environment audit
 
@@ -141,6 +143,19 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-15 - Phase 1/2 recovery-specific attribution v2 implementation
+
+- Phase/purpose: distinguish recovery-specific dynamics coverage from the simpler explanation that SFR contains more successful examples
+- Git commit: pending
+- Command/config: add equal-horizon nominal continuation `N`, `D_SFN_balanced`, action-phase labels, R-versus-N distinctiveness audit and six-cell visual diagnostics
+- Dataset path/version: planned smoke dataset under `$DATASET_DIR`; existing v1 pilot remains immutable
+- Seeds: planned small structural smoke seed 20260914; no training seed started yet
+- SLURM job ID/node: not applicable yet
+- Log/output path: `phase1/pusht_dataset.py`, `visualize_pusht_recovery_pairs.py`, Phase 1/2 tests and documentation
+- Status: running
+- Key metrics/error: implementation in progress; no v2 result is claimed yet
+- Decision/next action: remote regression, then generate 6–12 v2 scenarios and inspect R/N separation before any 200-pair generation or training
 
 ### 2026-09-14 22:05 - 原始框架与 recovery 扩展代码整理
 

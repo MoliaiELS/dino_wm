@@ -17,6 +17,7 @@ seed="${2:?training seed is required}"
 run_group="${3:?run group is required}"
 output_name="${4:-closed_loop.json}"
 extra_args=("${@:5}")
+dataset_name="${PHASE2_DATASET_NAME:-pusht_recovery_phase1_pilot_v1}"
 
 source ~/miniforge3/etc/profile.d/conda.sh
 cd ~/dino_wm
@@ -25,6 +26,7 @@ export SDL_VIDEODRIVER=dummy
 
 run_dir="$DATASET_DIR/phase2_runs/$run_group/$variant/seed_$seed"
 python evaluate_state_wm.py \
+  --dataset-dir "$DATASET_DIR/$dataset_name" \
   --checkpoint "$run_dir/checkpoint_best.pt" \
   --output "$run_dir/$output_name" \
   --skip-prediction \
