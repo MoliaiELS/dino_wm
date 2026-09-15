@@ -144,6 +144,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-15 10:08 - Phase 2 v2 stratified offline result and closed-loop jobs
+
+- Phase/purpose: verify that the one-seed SFN/SFR difference occurs on R and its recovery prefix, then test whether the signal is usable in closed loop
+- Git commit: stratified evaluation `9631a08`; completed fixture `a9aa096`; offline SLURM entry `a63c8e8`
+- Command/config: branch-specific 1/5/10/20-step prediction; R windows whose starting phase is `reposition` or `recontact`; same 30 paired test scenarios. Closed-loop uses horizon 4, action repeat 4, 256 samples, top-k 32, 4 CEM iterations, action cost 0.01, no smoothness cost and staging weight 1.0
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v2`
+- Seeds: training seed 0; deterministic per-scenario planning seeds
+- SLURM job ID/node: stratified evaluation `16216/16217`, completed on `3090node1` in 17s/14s; closed-loop `16218/16219` submitted
+- Log/output path: `$DATASET_DIR/phase2_runs/attribution_v2_65b750f/seed_0_sfn_vs_sfr_stratified.json`; closed-loop logs `$DATASET_DIR/logs/p2-v2-{sfn,sfr}-cl-<job>.out`
+- Status: offline completed; closed-loop queued/running
+- Key metrics/error: R-branch 20-step object-goal RMSE is 10.315 px for SFN versus 3.573 px for SFR. Starting only at recovery-prefix states, it is 16.287 versus 4.650 px; corresponding agent-object RMSE is 21.460 versus 2.136 px. Recovery top-1 is 0.80 versus 1.00 with paired scenario-bootstrap delta +0.20 [0.067, 0.367]. All related regression tests pass (15 tests); an initial fixture-only missing `success` field was corrected before evaluation.
+- Decision/next action: one-seed offline evidence supports recovery-specific rather than success-count-only value. Complete the matched closed-loop pilot before deciding whether additional training seeds are warranted.
+
 ### 2026-09-15 09:53 - Phase 2 v2 one-seed SFN/SFR attribution training
 
 - Phase/purpose: test whether off-nominal recovery data adds value beyond an equal number of successful on-manifold nominal continuations
