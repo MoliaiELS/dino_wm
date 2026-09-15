@@ -167,7 +167,7 @@ Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is 
 - Log/output path: pending
 - Status: implementation in progress
 - Key metrics/error: added cache schema, deterministic sim-state renderer, leakage-safe visual windows, explicit probe labels, temporal world model, frozen ridge/logistic probe evaluation, paired seed×scenario aggregation and SLURM entry points; initial Phase 3 plus Phase 2 regression passed 14 tests; no representation-quality runtime claim yet
-- Decision/next action: pass remote unit/integration tests, generate a small cache smoke subset, audit token/render consistency, then cache the full v2 data before any visual training
+- Decision/next action: cache audit has passed; finish the running seed-0 SFN/SFR visual training and execute the frozen probe suite before deciding whether to expand to three seeds
 
 ### 2026-09-15 12:10 - Fresh confirmatory dataset and locked-P3 evaluation
 
