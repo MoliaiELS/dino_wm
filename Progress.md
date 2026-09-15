@@ -151,11 +151,11 @@ Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is 
 - Command/config: `D_SFN_balanced` versus `D_SFR_balanced`, seed 0, shared `D_SF` train-only normalization, 50 epochs, batch 128, identical 580,587-parameter StateWorldModel and 1-step + 5-step rollout loss
 - Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v2`
 - Seeds: training seed 0
-- SLURM job ID/node: `16213` SFN running on `3090node1`; `16214` SFR pending under `AssocMaxJobsLimit`
+- SLURM job ID/node: `16213` SFN and `16214` SFR completed on `3090node1` with exit code `0` in 4m27s and 4m04s
 - Log/output path: `$DATASET_DIR/logs/p2-v2-sfn-s0-16213.out`, `$DATASET_DIR/logs/p2-v2-sfr-s0-16214.out`; run group `$DATASET_DIR/phase2_runs/attribution_v2_65b750f`
-- Status: running
-- Key metrics/error: both jobs submitted; the cluster currently allows only one active job for the user, so SFR will start after SFN
-- Decision/next action: wait for both automatic offline evaluations; compare prediction and recovery ranking first, without tuning on the test split or launching more seeds
+- Status: completed; branch/phase-stratified re-evaluation pending
+- Key metrics/error: best validation loss was 0.01339 for SFN and 0.02206 for SFR; these losses are not cross-condition outcomes because R is a more complex target distribution. On the common 30-pair test, preliminary aggregate prediction/ranking gives recovery top-1 0.80 versus 1.00, paired delta +0.20 with scenario-bootstrap 95% CI [0.067, 0.367], margin delta +0.130 [0.052, 0.209], and selection-regret reduction +0.102 [0.033, 0.179]. Twenty-step object-goal RMSE is 4.882 versus 2.536 px. This is one training seed only.
+- Decision/next action: add and run branch-specific plus recovery-prefix prediction reporting before interpreting the multi-step result; do not launch more seeds yet
 
 ### 2026-09-15 09:47 - Phase 1 v2 200-pair attribution dataset
 

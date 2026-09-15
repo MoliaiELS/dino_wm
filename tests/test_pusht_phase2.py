@@ -15,6 +15,7 @@ from phase2.data import (
 )
 from phase2.evaluation import (
     StateCEMPlanner,
+    evaluate_prediction_horizons,
     state_error_metrics,
     state_planning_cost,
     task_error,
@@ -202,6 +203,42 @@ def test_state_world_model_is_cpu_safe_causal_and_rolls_out():
 
     rollout = model.rollout(states[:, :1], actions[:, :4])
     assert rollout.shape == (2, 4, 11)
+
+
+def test_prediction_evaluation_can_filter_recovery_prefix(tmp_path):
+    dataset_dir = tmp_path / "paired_v2_phases"
+    _write_phase2_fixture(dataset_dir)
+    _upgrade_fixture_with_nominal_control(dataset_dir)
+    for scenario_id in ("scenario_train", "scenario_valid", "scenario_test"):
+        path = dataset_dir / "scenarios" / scenario_id / "R.npz"
+        with np.load(path) as record:
+            payload = {key: record[key] for key in record.files}
+        payload["phase"] = np.asarray(
+            ["reposition", "recontact", "corrective_push", "hold", "hold"]
+        )
+        np.savez_compressed(path, **payload)
+    stats = compute_train_normalization(dataset_dir, "D_SFR_balanced")
+    model = StateWorldModel(
+        max_context=5,
+        model_dim=32,
+        state_emb_dim=16,
+        action_emb_dim=8,
+        depth=1,
+        heads=4,
+        mlp_dim=48,
+        dim_head=8,
+        dropout=0.0,
+    )
+    metrics = evaluate_prediction_horizons(
+        model,
+        dataset_dir,
+        stats,
+        torch.device("cpu"),
+        horizons=(1,),
+        branches=("R",),
+        start_phases={"reposition", "recontact"},
+    )
+    assert metrics["1"]["sample_count"] == 2
 
 
 def test_task_error_and_state_metrics_have_physical_units():

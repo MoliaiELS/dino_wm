@@ -80,14 +80,14 @@ def compare_ranking(baseline, recovery, bootstrap_samples, seed):
     }
 
 
-def compare_prediction(baseline, recovery):
+def _compare_prediction_maps(baseline_prediction, recovery_prediction):
     result = {}
-    for horizon in sorted(baseline["prediction"], key=int):
-        if horizon not in recovery["prediction"]:
+    for horizon in sorted(baseline_prediction, key=int):
+        if horizon not in recovery_prediction:
             raise ValueError(f"Missing prediction horizon {horizon}")
         result[horizon] = {}
-        for metric, baseline_value in baseline["prediction"][horizon].items():
-            recovery_value = recovery["prediction"][horizon][metric]
+        for metric, baseline_value in baseline_prediction[horizon].items():
+            recovery_value = recovery_prediction[horizon][metric]
             if metric == "sample_count":
                 if baseline_value != recovery_value:
                     raise ValueError("Prediction evaluations used different samples")
@@ -99,6 +99,10 @@ def compare_prediction(baseline, recovery):
                     "reduction": baseline_value - recovery_value,
                 }
     return result
+
+
+def compare_prediction(baseline, recovery):
+    return _compare_prediction_maps(baseline["prediction"], recovery["prediction"])
 
 
 def compare_closed_loop(baseline, recovery, bootstrap_samples, seed):
@@ -165,6 +169,22 @@ def main():
         raise ValueError("Reports must use the same training seed")
     if "prediction" in baseline and "prediction" in recovery:
         report["prediction"] = compare_prediction(baseline, recovery)
+    if "prediction_by_branch" in baseline and "prediction_by_branch" in recovery:
+        report["prediction_by_branch"] = {
+            branch: _compare_prediction_maps(
+                baseline["prediction_by_branch"][branch],
+                recovery["prediction_by_branch"][branch],
+            )
+            for branch in baseline["prediction_by_branch"]
+        }
+    if (
+        "recovery_prefix_prediction" in baseline
+        and "recovery_prefix_prediction" in recovery
+    ):
+        report["recovery_prefix_prediction"] = _compare_prediction_maps(
+            baseline["recovery_prefix_prediction"],
+            recovery["recovery_prefix_prediction"],
+        )
     if "counterfactual_ranking" in baseline and "counterfactual_ranking" in recovery:
         report["counterfactual_ranking"] = compare_ranking(
             baseline, recovery, args.bootstrap_samples, args.seed

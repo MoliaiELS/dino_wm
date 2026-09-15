@@ -14,6 +14,7 @@ from phase2.evaluation import (
     dump_json,
     evaluate_closed_loop_recovery,
     evaluate_counterfactual_ranking,
+    evaluate_prediction_by_branch,
     evaluate_prediction_horizons,
 )
 
@@ -94,6 +95,26 @@ def main():
             batch_size=args.batch_size,
             stride=args.prediction_stride,
             max_scenarios=args.max_scenarios,
+        )
+        results["prediction_by_branch"] = evaluate_prediction_by_branch(
+            model,
+            args.dataset_dir,
+            stats,
+            device,
+            batch_size=args.batch_size,
+            stride=args.prediction_stride,
+            max_scenarios=args.max_scenarios,
+        )
+        results["recovery_prefix_prediction"] = evaluate_prediction_horizons(
+            model,
+            args.dataset_dir,
+            stats,
+            device,
+            batch_size=args.batch_size,
+            stride=args.prediction_stride,
+            max_scenarios=args.max_scenarios,
+            branches=("R",),
+            start_phases={"reposition", "recontact"},
         )
     if not args.skip_ranking:
         results["counterfactual_ranking"] = evaluate_counterfactual_ranking(

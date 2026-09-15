@@ -72,12 +72,18 @@ def _test_scenarios(manifest, max_scenarios=None):
 
 def _load_branch(dataset_dir: Path, scenario_id: str, branch: str):
     with np.load(dataset_dir / "scenarios" / scenario_id / f"{branch}.npz") as record:
-        return {
+        result = {
             "states": np.asarray(record["oracle_state"], dtype=np.float32).copy(),
             "actions": np.asarray(record["actions"], dtype=np.float32).copy(),
             "coverage": np.asarray(record["coverage"], dtype=np.float32).copy(),
             "success": np.asarray(record["success"], dtype=bool).copy(),
         }
+        result["phase"] = (
+            np.asarray(record["phase"]).astype(str).copy()
+            if "phase" in record.files
+            else None
+        )
+        return result
 
 
 def state_error_metrics(predicted, target):
@@ -112,8 +118,10 @@ def evaluate_prediction_horizons(
     batch_size=512,
     stride=1,
     max_scenarios=None,
+    branches=EVAL_BRANCHES,
+    start_phases=None,
 ):
-    """Evaluate the same universal S/F1/F2/R test set for every model."""
+    """Evaluate matched test windows, optionally restricted by branch/phase."""
 
     dataset_dir = Path(dataset_dir)
     manifest = load_manifest(dataset_dir)
@@ -123,9 +131,14 @@ def evaluate_prediction_horizons(
     for horizon in horizons:
         initial_states, action_sequences, targets = [], [], []
         for scenario_id in scenarios:
-            for branch in EVAL_BRANCHES:
+            for branch in branches:
                 record = _load_branch(dataset_dir, scenario_id, branch)
                 for start in range(0, len(record["actions"]) - horizon + 1, stride):
+                    if start_phases is not None and (
+                        record["phase"] is None
+                        or record["phase"][start] not in start_phases
+                    ):
+                        continue
                     initial_states.append(record["states"][start])
                     action_sequences.append(record["actions"][start : start + horizon])
                     targets.append(record["states"][start + horizon])
@@ -144,6 +157,34 @@ def evaluate_prediction_horizons(
         predictions = np.concatenate(predicted_batches, axis=0)
         results[str(horizon)] = state_error_metrics(predictions, np.asarray(targets))
     return results
+
+
+@torch.no_grad()
+def evaluate_prediction_by_branch(
+    model,
+    dataset_dir,
+    stats,
+    device,
+    horizons=(1, 5, 10, 20),
+    batch_size=512,
+    stride=1,
+    max_scenarios=None,
+):
+    """Expose whether aggregate gains occur on nominal, failure or recovery data."""
+    return {
+        branch: evaluate_prediction_horizons(
+            model,
+            dataset_dir,
+            stats,
+            device,
+            horizons=horizons,
+            batch_size=batch_size,
+            stride=stride,
+            max_scenarios=max_scenarios,
+            branches=(branch,),
+        )
+        for branch in EVAL_BRANCHES
+    }
 
 
 @torch.no_grad()
