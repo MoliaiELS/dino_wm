@@ -255,7 +255,7 @@ def _aggregate_closed_loop(baseline_reports, recovery_reports, samples, seed):
         }
 
     success_delta = matrix("success")
-    return {
+    result = {
         "success_rate": {
             **levels("success_rate"),
             "baseline_total_successes": int(sum(
@@ -281,6 +281,25 @@ def _aggregate_closed_loop(baseline_reports, recovery_reports, samples, seed):
             matrix("action_cost"), samples, seed + 103
         ),
     }
+    optional_metrics = (
+        (
+            "coverage_retention_loss",
+            "mean_coverage_retention_loss",
+            "paired_coverage_retention_loss_delta",
+            104,
+        ),
+    )
+    for row_metric, report_metric, paired_key, seed_offset in optional_metrics:
+        reports = baseline_reports + recovery_reports
+        row_sets = baseline_rows + recovery_rows
+        if all(
+            report_metric in report["closed_loop_recovery"] for report in reports
+        ) and all(row_metric in row for rows in row_sets for row in rows):
+            result[row_metric] = levels(report_metric)
+            result[paired_key] = crossed_paired_bootstrap(
+                matrix(row_metric), samples, seed + seed_offset
+            )
+    return result
 
 
 def aggregate_run(
@@ -288,6 +307,7 @@ def aggregate_run(
     seeds,
     baseline_variant="D_SF_balanced",
     recovery_variant="D_SFR_balanced",
+    evaluation_name="evaluation.json",
     closed_loop_name="closed_loop_short_shaped.json",
     bootstrap_samples=10000,
     bootstrap_seed=0,
@@ -300,8 +320,8 @@ def aggregate_run(
     for training_seed in seeds:
         baseline_dir = run_dir / baseline_variant / f"seed_{training_seed}"
         recovery_dir = run_dir / recovery_variant / f"seed_{training_seed}"
-        baseline_evaluation = _read(baseline_dir / "evaluation.json")
-        recovery_evaluation = _read(recovery_dir / "evaluation.json")
+        baseline_evaluation = _read(baseline_dir / evaluation_name)
+        recovery_evaluation = _read(recovery_dir / evaluation_name)
         if baseline_evaluation["training_seed"] != training_seed:
             raise ValueError("Baseline report training seed mismatch")
         if recovery_evaluation["training_seed"] != training_seed:
@@ -356,6 +376,7 @@ def parse_args():
     parser.add_argument("--seeds", type=int, nargs="+", required=True)
     parser.add_argument("--baseline-variant", default="D_SF_balanced")
     parser.add_argument("--recovery-variant", default="D_SFR_balanced")
+    parser.add_argument("--evaluation-name", default="evaluation.json")
     parser.add_argument("--closed-loop-name", default="closed_loop_short_shaped.json")
     parser.add_argument("--bootstrap-samples", type=int, default=10000)
     parser.add_argument("--bootstrap-seed", type=int, default=0)
@@ -370,6 +391,7 @@ def main():
         args.seeds,
         baseline_variant=args.baseline_variant,
         recovery_variant=args.recovery_variant,
+        evaluation_name=args.evaluation_name,
         closed_loop_name=args.closed_loop_name,
         bootstrap_samples=args.bootstrap_samples,
         bootstrap_seed=args.bootstrap_seed,

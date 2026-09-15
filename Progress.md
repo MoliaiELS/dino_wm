@@ -153,6 +153,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-15 12:10 - Fresh confirmatory dataset and locked-P3 evaluation
+
+- Phase/purpose: test the validation-selected P3 planner on simulator scenes that were not used for model training, planner selection or earlier pilot reporting
+- Git commit: dataset/evaluator `338634e`; result aggregation and plotting are in the following implementation commit
+- Command/config: generate 60 `--all-test` scenarios with seed 20260916 and exactly 10 scenarios per perturbation type/severity cell; evaluate all SFN/SFR checkpoints with locked P3 (horizon 4, repeat 2, action norm cap 0.5, trajectory/progress/object-speed weights 0.5/1.0/0.5, minimum predicted improvement 0.005)
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_confirmatory_v2_seed20260916_60`; checkpoints remain under `$DATASET_DIR/phase2_runs/attribution_v2_65b750f`
+- Seeds: new simulator base seed 20260916; training seeds 0/1/2
+- SLURM job ID/node: generation `16268` on `4090node3`; closed-loop seed 0 `16269/16270`, seed 1 `16271/16272`, seed 2 `16274/16275` on `4090node1`, all completed with exit code 0; mistyped variant attempt `16273` failed before evaluation and produced no result
+- Log/output path: `$DATASET_DIR/logs/cf60-*-<job>.out`; per-checkpoint result `confirmatory_p3_seed20260916_60.json`
+- Status: dataset and six closed-loop evaluations completed; crossed-bootstrap aggregation pending
+- Key metrics/error: Gate A passed with 60 test scenarios, 10 per cell, S/N/R success 1.0, F1/F2 success 0, exact branch/action/alignment errors 0. SFN success by seed is 0/60, 1/60, 2/60; SFR is 25/60, 12/60, 5/60. Mean final coverage by seed is SFN 0.385/0.555/0.483 versus SFR 0.667/0.495/0.483. SFR reaches substantially higher maximum coverage in all seeds but has larger peak-to-final retention loss in every seed; no evaluated action exceeds the 0.5 norm cap.
+- Decision/next action: aggregate paired scenario/seed uncertainty without changing P3; add retention loss to the formal aggregate and render the confirmatory result figure before updating Gate B
+
 ### 2026-09-15 11:24 - Phase 2 validation planner selection locked
 
 - Phase/purpose: select one planner configuration on validation data before generating an untouched confirmatory set

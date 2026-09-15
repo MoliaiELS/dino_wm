@@ -45,12 +45,14 @@ def _evaluation(training_seed, recovery_rich):
 
 def _closed_loop(training_seed, recovery_rich):
     coverage = 0.8 if recovery_rich else 0.4
+    retention_loss = 0.05 if recovery_rich else 0.2
     rows = [
         {
             "scenario_id": scenario_id,
             "success": recovery_rich,
             "final_coverage": coverage,
             "max_coverage": coverage + 0.1,
+            "coverage_retention_loss": retention_loss,
             "action_cost": 1.0 if recovery_rich else 2.0,
         }
         for scenario_id in ("a", "b")
@@ -61,6 +63,7 @@ def _closed_loop(training_seed, recovery_rich):
             "success_rate": float(recovery_rich),
             "mean_final_coverage": coverage,
             "mean_max_coverage": coverage + 0.1,
+            "mean_coverage_retention_loss": retention_loss,
             "mean_action_cost": 1.0 if recovery_rich else 2.0,
             "per_scenario": rows,
         },
@@ -99,3 +102,6 @@ def test_aggregate_run(tmp_path):
     assert closed_loop["success_rate"]["baseline_total_successes"] == 0
     assert closed_loop["success_rate"]["recovery_rich_total_successes"] == 4
     assert closed_loop["paired_final_coverage_delta"]["mean"] == 0.4
+    assert np.isclose(
+        closed_loop["paired_coverage_retention_loss_delta"]["mean"], -0.15
+    )
