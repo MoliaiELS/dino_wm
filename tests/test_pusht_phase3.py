@@ -79,7 +79,11 @@ def test_visual_cache_datasets_and_labels(tmp_path):
     )
     rows = [probes[index] for index in range(len(probes))]
     f1_rows = [row for row in rows if row["branch"] == "F1"]
-    assert f1_rows and all(row["off_nominal"] == 1 for row in f1_rows)
+    assert f1_rows and all(not row["off_nominal_mask"] for row in f1_rows)
+    recovery_rows = [row for row in rows if row["branch"] == "R"]
+    nominal_rows = [row for row in rows if row["branch"] == "N"]
+    assert recovery_rows and all(row["off_nominal"] == 1 for row in recovery_rows)
+    assert nominal_rows and all(row["off_nominal"] == 0 for row in nominal_rows)
     assert all(not row["recoverability_mask"] for row in f1_rows)
     s_rows = [row for row in rows if row["branch"] == "S"]
     assert any(row["recoverable"] == 1 for row in s_rows)

@@ -144,7 +144,7 @@ def _classification_metrics(target, probability, threshold=0.5):
 def _fit_progress(train, valid, test, alphas):
     best = None
     for alpha in alphas:
-        model = make_pipeline(StandardScaler(), Ridge(alpha=alpha))
+        model = make_pipeline(StandardScaler(), Ridge(alpha=alpha, solver="lsqr"))
         model.fit(train["features"], train["coverage"])
         prediction = model.predict(valid["features"])
         score = mean_absolute_error(valid["coverage"], prediction)
@@ -210,7 +210,7 @@ def parse_args():
     parser.add_argument("--output", required=True)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--history", type=int, default=3)
-    parser.add_argument("--recoverability-horizon", type=int, default=10)
+    parser.add_argument("--recoverability-horizon", type=int, default=5)
     parser.add_argument("--batch-size", type=int, default=256)
     parser.add_argument("--num-workers", type=int, default=4)
     parser.add_argument("--device", default="cuda")
@@ -259,12 +259,13 @@ def main():
         "test_cache_dir": str(Path(args.test_cache_dir).resolve()),
         "history": args.history,
         "recoverability_definition": (
-            f"success under recorded S/N/R oracle continuation within {args.recoverability_horizon} steps"
+            f"from a not-yet-successful S/N/R frame, success under the recorded "
+            f"oracle continuation within the next {args.recoverability_horizon} steps"
         ),
         "off_nominal_definition": {
-            "positive_phases": sorted(["reposition", "recontact", "open_loop_failure", "neutral"]),
-            "negative_phases": sorted(["nominal_push", "hold"]),
-            "excluded_ambiguous_phase": "corrective_push",
+            "positive": "R frames in reposition/recontact",
+            "negative": "same scenario and frame indices from success-matched N",
+            "excluded": "F1/F2/S and R corrective_push/hold",
         },
         "sample_counts": {
             "train": len(train_dataset),

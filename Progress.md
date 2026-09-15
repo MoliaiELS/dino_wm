@@ -156,6 +156,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-15 15:28 - Experiment B probe-definition calibration
+
+- Phase/purpose: check whether the first probe labels have enough headroom to test a recovery-relevant representation claim
+- Git commit: initial probes `3f00f1f`; corrected definitions are in the following implementation commit
+- Command/config: seed-0 raw DINO, oracle state, random adapter, trained SFN and trained SFR; fresh 60-scenario cache; ridge/logistic probes selected on v2 validation
+- Dataset path/version: train cache `$DATASET_DIR/pusht_recovery_dino_cache_v2_4x4_b9585d1`; test cache `$DATASET_DIR/pusht_recovery_dino_cache_confirmatory_seed20260916_60_4x4_b9585d1`
+- Seeds: training/probe seed 0
+- SLURM job ID/node: `16306` on `4090node1`
+- Log/output path: `$DATASET_DIR/logs/p3-probes-s0-16306.out`; results under `$DATASET_DIR/phase3_runs/visual_attribution_v1_3f00f1f/probes`
+- Status: completed but invalid for final comparison; retained as calibration evidence
+- Key metrics/error: raw DINO already reached progress R2 0.986 and off-nominal AUROC 1.000; the original recoverability label was 96.6% positive. Ridge also emitted ill-conditioned solve warnings. These saturated/imbalanced definitions cannot provide a meaningful Gate C test.
+- Decision/next action: use deterministic LSQR ridge; redefine off-nominal as exactly frame-aligned R reposition/recontact versus N; restrict recoverability to not-yet-successful S/N/R frames and ask whether the recorded oracle succeeds within the next 5 steps; rerun seed 0 before expanding
+
 ### 2026-09-15 15:05 - Experiment B cached-DINO pipeline implementation
 
 - Phase/purpose: begin the minimum visual representation experiment after the controlled Experiment A Gate B pass

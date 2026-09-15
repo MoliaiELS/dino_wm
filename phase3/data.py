@@ -15,13 +15,7 @@ from torch.utils.data import Dataset
 
 
 SUPPORTED_CACHE_SCHEMA = "pusht-recovery-dino-cache-v1"
-OFF_NOMINAL_PHASES = {
-    "reposition",
-    "recontact",
-    "open_loop_failure",
-    "neutral",
-}
-NOMINAL_PHASES = {"nominal_push", "hold"}
+RECOVERY_PREFIX_PHASES = {"reposition", "recontact"}
 RECOVERABILITY_BRANCHES = {"S", "N", "R"}
 
 
@@ -233,7 +227,7 @@ class VisualProbeFrameDataset(_CachedTrajectoryMixin, Dataset):
         split,
         stats,
         history=3,
-        recoverability_horizon=10,
+        recoverability_horizon=5,
         branches=("S", "N", "F1", "F2", "R"),
         max_samples=None,
         seed=0,
@@ -279,15 +273,26 @@ class VisualProbeFrameDataset(_CachedTrajectoryMixin, Dataset):
         tokens, proprio = self._tensor_frame_data(record, slice(start, frame + 1))
         actions = np.asarray(record["actions"][start:frame], dtype=np.float32)
         phase = self._phase_at(record, frame)
-        if phase in OFF_NOMINAL_PHASES:
+        # A hard, exactly aligned off-nominal comparison: recovery-prefix R
+        # frames are positives and the same frame indices from N are negatives.
+        # Failure branches and ambiguous corrective-push frames are excluded.
+        if entry["branch"] == "R" and phase in RECOVERY_PREFIX_PHASES:
             off_nominal, off_mask = 1, True
-        elif phase in NOMINAL_PHASES:
-            off_nominal, off_mask = 0, True
+        elif entry["branch"] == "N":
+            recovery_record = self._load_branch(entry["scenario_id"], "R")
+            recovery_phase = self._phase_at(recovery_record, frame)
+            off_nominal = 0
+            off_mask = recovery_phase in RECOVERY_PREFIX_PHASES
         else:
             off_nominal, off_mask = 0, False
-        recoverability_mask = entry["branch"] in RECOVERABILITY_BRANCHES
-        horizon_stop = min(len(record["success"]), frame + self.recoverability_horizon + 1)
-        recoverable = bool(np.any(record["success"][frame:horizon_stop]))
+        current_success = bool(record["success"][frame])
+        recoverability_mask = (
+            entry["branch"] in RECOVERABILITY_BRANCHES and not current_success
+        )
+        horizon_stop = min(
+            len(record["success"]), frame + self.recoverability_horizon + 1
+        )
+        recoverable = bool(np.any(record["success"][frame + 1 : horizon_stop]))
         return {
             "tokens": tokens,
             "proprio": proprio,
