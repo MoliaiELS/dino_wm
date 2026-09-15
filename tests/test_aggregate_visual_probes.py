@@ -49,5 +49,6 @@ def test_aggregate_visual_probe_paired_effects():
         seed=7,
     )
     assert result["representations"]["temporal_sfr"]["task_progress"]["mae"]["mean"] == 0.0
+    assert "oracle_state_mlp_upper" in result["representations"]
     assert result["paired_recovery_effect"]["task_progress"]["mean"] > 0
     assert result["paired_recovery_effect"]["off_nominal"]["mean"] > 0

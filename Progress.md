@@ -109,10 +109,10 @@ Last updated: 2026-09-15
 
 ### Phase 3 - Experiment B
 
-- [~] Implement temporal dynamics adapter/context representation over frozen DINO tokens.
-- [ ] Define representation extraction consistently across datasets.
-- [ ] Implement progress, off-nominal and recoverability probes.
-- [ ] Add raw DINO, random adapter and oracle-state baselines.
+- [x] Implement temporal dynamics adapter/context representation over frozen DINO tokens.
+- [x] Define representation extraction consistently across datasets.
+- [x] Implement progress, off-nominal and recoverability probes.
+- [~] Add raw DINO, random adapter and oracle-state baselines; seed-0 visual baselines are complete and the oracle probe is being corrected to a nonlinear shallow-MLP upper bound.
 - [ ] Implement goal-set latent planning objective.
 - [ ] Evaluate visual closed-loop recovery.
 
@@ -155,6 +155,19 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-15 15:42 - Experiment B seed-0 corrected probes and oracle-upper-bound repair
+
+- Phase/purpose: evaluate the corrected recovery-specific probe definitions, then remove the misleading assumption that a linear oracle-state probe is an upper bound
+- Git commit: corrected labels/LSQR `10277f3`; shallow-MLP oracle implementation in the following commit
+- Command/config: raw DINO, random adapter, trained SFN/SFR and oracle-state probes on the fresh 60-scenario cache; visual representations retain identical ridge/logistic probes, while oracle state uses a fixed 64-hidden-unit shallow MLP with regularization selected only on the v2 validation split
+- Dataset path/version: train cache `$DATASET_DIR/pusht_recovery_dino_cache_v2_4x4_b9585d1`; test cache `$DATASET_DIR/pusht_recovery_dino_cache_confirmatory_seed20260916_60_4x4_b9585d1`; run group `$DATASET_DIR/phase3_runs/visual_attribution_v1_3f00f1f`
+- Seeds: training/probe seed 0; seeds 1/2 pending
+- SLURM job ID/node: corrected seed-0 suite `16307` on `4090node1`; oracle-MLP rerun pending
+- Log/output path: `$DATASET_DIR/logs/p3-probes-corrected-s0-16307.out`; JSON results under the run-group `probes/` directory
+- Status: seed-0 corrected linear probes completed; oracle-upper-bound correction implemented and awaiting remote regression
+- Key metrics/error: raw DINO progress MAE 0.0283/R2 0.9864, off-nominal AUROC 1.000 and recoverability AUROC 0.9880, showing little headroom. SFN versus SFR progress MAE is 0.0361 versus 0.0397; off-nominal AUROC 1.0000 versus 0.9989; recoverability balanced accuracy 0.9568 versus 0.9599 and Brier 0.03192 versus 0.03138, but recoverability AUROC is 0.99151 versus 0.99102. The only SFR gain is tiny and metric-dependent, so seed 0 alone does not satisfy Gate C. The previous linear oracle progress result was below raw DINO and is relabelled invalid as an upper bound.
+- Decision/next action: remotely test the fixed oracle MLP, rerun that baseline, then train/evaluate matched SFN/SFR seeds 1/2 and use crossed seed-by-scenario bootstrap intervals before accepting or rejecting Gate C
 
 ### 2026-09-15 15:28 - Experiment B probe-definition calibration
 

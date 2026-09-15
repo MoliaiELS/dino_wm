@@ -19,6 +19,7 @@ from sklearn.metrics import (
     r2_score,
     roc_auc_score,
 )
+from sklearn.neural_network import MLPClassifier, MLPRegressor
 from sklearn.pipeline import make_pipeline
 from sklearn.preprocessing import StandardScaler
 from torch.utils.data import DataLoader
@@ -141,10 +142,26 @@ def _classification_metrics(target, probability, threshold=0.5):
     }
 
 
-def _fit_progress(train, valid, test, alphas):
+def _fit_progress(train, valid, test, alphas, probe_family="linear"):
     best = None
     for alpha in alphas:
-        model = make_pipeline(StandardScaler(), Ridge(alpha=alpha, solver="lsqr"))
+        if probe_family == "linear":
+            estimator = Ridge(alpha=alpha, solver="lsqr")
+        elif probe_family == "mlp":
+            estimator = MLPRegressor(
+                hidden_layer_sizes=(64,),
+                alpha=alpha,
+                batch_size=256,
+                learning_rate_init=1e-3,
+                max_iter=300,
+                early_stopping=True,
+                validation_fraction=0.1,
+                n_iter_no_change=15,
+                random_state=0,
+            )
+        else:
+            raise ValueError(f"Unknown probe family {probe_family}")
+        model = make_pipeline(StandardScaler(), estimator)
         model.fit(train["features"], train["coverage"])
         prediction = model.predict(valid["features"])
         score = mean_absolute_error(valid["coverage"], prediction)
@@ -162,33 +179,48 @@ def _fit_progress(train, valid, test, alphas):
     }
 
 
-def _fit_classifier(train, valid, test, label_key, mask_key, cs):
+def _fit_classifier(
+    train, valid, test, label_key, mask_key, regularization, probe_family="linear"
+):
     train_mask = train[mask_key].astype(bool)
     valid_mask = valid[mask_key].astype(bool)
     test_mask = test[mask_key].astype(bool)
     if len(np.unique(train[label_key][train_mask])) != 2:
         raise ValueError(f"Training label {label_key} does not contain two classes")
     best = None
-    for c_value in cs:
-        model = make_pipeline(
-            StandardScaler(),
-            LogisticRegression(
-                C=c_value,
+    for value in regularization:
+        if probe_family == "linear":
+            estimator = LogisticRegression(
+                C=value,
                 class_weight="balanced",
                 max_iter=1000,
                 random_state=0,
-            ),
-        )
+            )
+        elif probe_family == "mlp":
+            estimator = MLPClassifier(
+                hidden_layer_sizes=(64,),
+                alpha=value,
+                batch_size=256,
+                learning_rate_init=1e-3,
+                max_iter=300,
+                early_stopping=True,
+                validation_fraction=0.1,
+                n_iter_no_change=15,
+                random_state=0,
+            )
+        else:
+            raise ValueError(f"Unknown probe family {probe_family}")
+        model = make_pipeline(StandardScaler(), estimator)
         model.fit(train["features"][train_mask], train[label_key][train_mask])
         probability = model.predict_proba(valid["features"][valid_mask])[:, 1]
         score = roc_auc_score(valid[label_key][valid_mask], probability)
         if best is None or score > best[0]:
-            best = (score, c_value, model)
-    _, c_value, model = best
+            best = (score, value, model)
+    _, selected_regularization, model = best
     probability = model.predict_proba(test["features"][test_mask])[:, 1]
     target = test[label_key][test_mask].astype(int)
     return {
-        "selected_c": c_value,
+        "selected_regularization": selected_regularization,
         "validation_roc_auc": best[0],
         "test": _classification_metrics(target, probability),
         "test_probabilities": probability.astype(float).tolist(),
@@ -217,6 +249,9 @@ def parse_args():
     parser.add_argument("--max-samples", type=int)
     parser.add_argument("--ridge-alphas", type=float, nargs="+", default=[0.01, 0.1, 1.0, 10.0, 100.0])
     parser.add_argument("--logistic-c", type=float, nargs="+", default=[0.01, 0.1, 1.0, 10.0])
+    parser.add_argument(
+        "--mlp-alpha", type=float, nargs="+", default=[0.0001, 0.001, 0.01]
+    )
     return parser.parse_args()
 
 
@@ -250,6 +285,13 @@ def main():
     train = _extract(train_loader, args.representation, model, device)
     valid = _extract(valid_loader, args.representation, model, device)
     test = _extract(test_loader, args.representation, model, device)
+    probe_family = "mlp" if args.representation == "oracle_state" else "linear"
+    regression_regularization = (
+        args.mlp_alpha if probe_family == "mlp" else args.ridge_alphas
+    )
+    classification_regularization = (
+        args.mlp_alpha if probe_family == "mlp" else args.logistic_c
+    )
     report = {
         "representation": args.representation,
         "source_variant": source_variant,
@@ -258,6 +300,12 @@ def main():
         "train_cache_dir": str(Path(args.train_cache_dir).resolve()),
         "test_cache_dir": str(Path(args.test_cache_dir).resolve()),
         "history": args.history,
+        "probe_family": probe_family,
+        "oracle_upper_bound_definition": (
+            "fixed 64-hidden-unit shallow MLP selected only by v2 validation"
+            if args.representation == "oracle_state"
+            else None
+        ),
         "recoverability_definition": (
             f"from a not-yet-successful S/N/R frame, success under the recorded "
             f"oracle continuation within the next {args.recoverability_horizon} steps"
@@ -274,10 +322,16 @@ def main():
             "feature_dim": int(train["features"].shape[1]),
         },
         "task_progress": _fit_progress(
-            train, valid, test, args.ridge_alphas
+            train, valid, test, regression_regularization, probe_family
         ),
         "off_nominal": _fit_classifier(
-            train, valid, test, "off_nominal", "off_nominal_mask", args.logistic_c
+            train,
+            valid,
+            test,
+            "off_nominal",
+            "off_nominal_mask",
+            classification_regularization,
+            probe_family,
         ),
         "recoverability": _fit_classifier(
             train,
@@ -285,7 +339,8 @@ def main():
             test,
             "recoverable",
             "recoverability_mask",
-            args.logistic_c,
+            classification_regularization,
+            probe_family,
         ),
     }
     dump_json(args.output, report)

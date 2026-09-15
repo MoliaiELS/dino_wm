@@ -88,7 +88,7 @@ def aggregate(baseline_reports, recovery_reports, raw_report, random_reports, or
         "random_adapter": random_reports,
         "temporal_sfn": baseline_reports,
         "temporal_sfr": recovery_reports,
-        "oracle_state": [oracle_report],
+        "oracle_state_mlp_upper": [oracle_report],
     }
     for name, reports in representation_reports.items():
         report["representations"][name] = {
