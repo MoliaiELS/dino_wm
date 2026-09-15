@@ -142,6 +142,7 @@ RGB -> frozen DINO encoder -> VisualWorldModel -> CEM/GD/MPC planner
 | `aggregate_state_wm.py` | 汇总 3 seeds，并对 seed 与 scenario 交叉 bootstrap | 新增最终 pilot 汇总入口 |
 | `scripts/slurm_train_state_wm.sh` | 远端训练任务入口；可用 `PHASE2_DATASET_NAME` 选择 v1/v2 数据 | v1 已完成 seeds 0/1/2 |
 | `scripts/slurm_eval_state_wm.sh` | 远端评估任务入口；与训练共享显式数据版本 | v1 已完成离线及闭环评价 |
+| `scripts/slurm_eval_state_wm_offline.sh` | checkpoint 不变时重跑 branch/phase-stratified 离线评价 | v2 attribution 使用 |
 | `tests/test_pusht_phase2.py` | loader、模型 rollout、评价和 planner 单元/集成回归 | 远端通过 |
 | `tests/test_aggregate_state_wm.py` | 跨 seed 聚合和置信区间测试 | 与 Phase 2 tests 合计 10 tests passed |
 
