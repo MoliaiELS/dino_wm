@@ -12,6 +12,12 @@ def _write(path, payload):
 
 def _evaluation(training_seed, recovery_rich):
     offset = 1.0 if recovery_rich else 0.0
+    prediction = {
+        "1": {
+            "sample_count": 2,
+            "object_goal_position_rmse_px": 1.0 if recovery_rich else 3.0,
+        }
+    }
     return {
         "training_seed": training_seed,
         "counterfactual_ranking": {
@@ -31,12 +37,9 @@ def _evaluation(training_seed, recovery_rich):
                 },
             ],
         },
-        "prediction": {
-            "1": {
-                "sample_count": 2,
-                "object_goal_position_rmse_px": 1.0 if recovery_rich else 3.0,
-            }
-        },
+        "prediction": prediction,
+        "prediction_by_branch": {"R": prediction},
+        "recovery_prefix_prediction": prediction,
     }
 
 
@@ -88,6 +91,10 @@ def test_aggregate_run(tmp_path):
     assert ranking["paired_selection_regret_reduction"]["mean"] == 0.5
     prediction = report["prediction"]["1"]["object_goal_position_rmse_px"]
     assert prediction["mean_reduction"] == 2.0
+    branch_prediction = report["prediction_by_branch"]["R"]["1"]
+    assert branch_prediction["object_goal_position_rmse_px"]["mean_reduction"] == 2.0
+    prefix_prediction = report["recovery_prefix_prediction"]["1"]
+    assert prefix_prediction["object_goal_position_rmse_px"]["mean_reduction"] == 2.0
     closed_loop = report["closed_loop_recovery"]
     assert closed_loop["success_rate"]["baseline_total_successes"] == 0
     assert closed_loop["success_rate"]["recovery_rich_total_successes"] == 4

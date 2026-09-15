@@ -137,21 +137,26 @@ def _aggregate_ranking(baseline_reports, recovery_reports, samples, seed):
     }
 
 
-def _aggregate_prediction(baseline_reports, recovery_reports, samples, seed):
-    horizons = sorted(baseline_reports[0]["prediction"], key=int)
+def _aggregate_prediction_maps(
+    baseline_predictions,
+    recovery_predictions,
+    samples,
+    seed,
+):
+    horizons = sorted(baseline_predictions[0], key=int)
     result = {}
     offset = 0
     for horizon in horizons:
-        metrics = baseline_reports[0]["prediction"][horizon]
+        metrics = baseline_predictions[0][horizon]
         result[horizon] = {}
         for metric in metrics:
             baseline_values = [
-                report["prediction"][horizon][metric]
-                for report in baseline_reports
+                prediction[horizon][metric]
+                for prediction in baseline_predictions
             ]
             recovery_values = [
-                report["prediction"][horizon][metric]
-                for report in recovery_reports
+                prediction[horizon][metric]
+                for prediction in recovery_predictions
             ]
             if metric == "sample_count":
                 if len(set(baseline_values + recovery_values)) != 1:
@@ -170,6 +175,56 @@ def _aggregate_prediction(baseline_reports, recovery_reports, samples, seed):
                 "mean_reduction": delta_summary["mean"],
                 "seed_bootstrap_95_ci": delta_summary["seed_bootstrap_95_ci"],
             }
+    return result
+
+
+def _aggregate_prediction(baseline_reports, recovery_reports, samples, seed):
+    return _aggregate_prediction_maps(
+        [report["prediction"] for report in baseline_reports],
+        [report["prediction"] for report in recovery_reports],
+        samples,
+        seed,
+    )
+
+
+def _aggregate_stratified_predictions(
+    baseline_reports,
+    recovery_reports,
+    samples,
+    seed,
+):
+    optional_keys = ("prediction_by_branch", "recovery_prefix_prediction")
+    for key in optional_keys:
+        baseline_has = [key in report for report in baseline_reports]
+        recovery_has = [key in report for report in recovery_reports]
+        if any(baseline_has + recovery_has) and not all(baseline_has + recovery_has):
+            raise ValueError(f"Evaluation reports disagree on optional field {key}")
+
+    result = {}
+    if all("prediction_by_branch" in report for report in baseline_reports):
+        branches = sorted(baseline_reports[0]["prediction_by_branch"])
+        if any(
+            sorted(report["prediction_by_branch"]) != branches
+            for report in baseline_reports + recovery_reports
+        ):
+            raise ValueError("Prediction reports used different branch sets")
+        result["prediction_by_branch"] = {
+            branch: _aggregate_prediction_maps(
+                [report["prediction_by_branch"][branch] for report in baseline_reports],
+                [report["prediction_by_branch"][branch] for report in recovery_reports],
+                samples,
+                seed + 200 + branch_index * 50,
+            )
+            for branch_index, branch in enumerate(branches)
+        }
+
+    if all("recovery_prefix_prediction" in report for report in baseline_reports):
+        result["recovery_prefix_prediction"] = _aggregate_prediction_maps(
+            [report["recovery_prefix_prediction"] for report in baseline_reports],
+            [report["recovery_prefix_prediction"] for report in recovery_reports],
+            samples,
+            seed + 500,
+        )
     return result
 
 
@@ -255,7 +310,7 @@ def aggregate_run(
         recovery_evaluations.append(recovery_evaluation)
         baseline_closed_loop.append(_read(baseline_dir / closed_loop_name))
         recovery_closed_loop.append(_read(recovery_dir / closed_loop_name))
-    return {
+    report = {
         "run_dir": str(run_dir.resolve()),
         "training_seeds": list(seeds),
         "baseline_variant": baseline_variant,
@@ -284,6 +339,15 @@ def aggregate_run(
             bootstrap_seed,
         ),
     }
+    report.update(
+        _aggregate_stratified_predictions(
+            baseline_evaluations,
+            recovery_evaluations,
+            bootstrap_samples,
+            bootstrap_seed,
+        )
+    )
+    return report
 
 
 def parse_args():
