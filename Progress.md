@@ -109,7 +109,7 @@ Last updated: 2026-09-15
 
 ### Phase 3 - Experiment B
 
-- [ ] Implement temporal dynamics adapter/context representation over frozen DINO tokens.
+- [~] Implement temporal dynamics adapter/context representation over frozen DINO tokens.
 - [ ] Define representation extraction consistently across datasets.
 - [ ] Implement progress, off-nominal and recoverability probes.
 - [ ] Add raw DINO, random adapter and oracle-state baselines.
@@ -155,6 +155,19 @@ Make a representation claim only if the learned temporal representation improves
 ## Run log
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
+
+### 2026-09-15 15:05 - Experiment B cached-DINO pipeline implementation
+
+- Phase/purpose: begin the minimum visual representation experiment after the controlled Experiment A Gate B pass
+- Git commit: this implementation commit; exact hash to be recorded after remote regression
+- Command/config: deterministically rerender every saved 27-D simulator state at 224 px; frozen `dinov2_vits14` patch tokens; fixed adaptive 4x4 spatial pooling; three-frame action-conditioned causal ViT adapter; visual-token plus proprio prediction loss
+- Dataset path/version: source `$DATASET_DIR/pusht_recovery_phase1_pilot_v2`; planned cache `$DATASET_DIR/pusht_recovery_dino_cache_v2`; fresh source/cache kept separate
+- Seeds: implementation tests first; visual training seeds planned as 0/1/2 after cache audit and one-seed smoke
+- SLURM job ID/node: not submitted
+- Log/output path: pending
+- Status: implementation in progress
+- Key metrics/error: added cache schema, deterministic sim-state renderer, leakage-safe visual windows, explicit probe labels, temporal world model and SLURM entry points; no runtime claim yet
+- Decision/next action: pass remote unit/integration tests, generate a small cache smoke subset, audit token/render consistency, then cache the full v2 data before any visual training
 
 ### 2026-09-15 12:10 - Fresh confirmatory dataset and locked-P3 evaluation
 
