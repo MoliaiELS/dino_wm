@@ -13,12 +13,23 @@ from phase1.pusht_dataset import (
     VARIANTS,
     Phase1Config,
     PushTPhase1Generator,
+    _split_scenarios,
     rollout_from_snapshot,
 )
 from phase1.pusht_oracle import GeometricPushTOracle
 
 
 FIXTURE_DIR = Path(__file__).parent / "fixtures" / "pusht_phase1_pilot_v1"
+
+
+def test_confirmatory_split_can_assign_every_scenario_to_test():
+    split_map = _split_scenarios(
+        60,
+        {"train": 0.0, "valid": 0.0, "test": 1.0},
+        seed=20260916,
+    )
+    assert len(split_map) == 60
+    assert set(split_map.values()) == {"test"}
 
 
 def test_geometric_oracle_solves_controlled_nominal_translation():

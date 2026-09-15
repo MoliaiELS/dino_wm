@@ -28,6 +28,11 @@ def parse_args():
     parser.add_argument("--branch-horizon", type=int, default=35)
     parser.add_argument("--window-length", type=int, default=21)
     parser.add_argument("--no-videos", action="store_true")
+    parser.add_argument(
+        "--all-test",
+        action="store_true",
+        help="Assign every generated scenario to test for a locked confirmatory set",
+    )
     parser.add_argument("--skip-video-verification", action="store_true")
     parser.add_argument("--audit-only", action="store_true")
     return parser.parse_args()
@@ -49,6 +54,10 @@ def main():
             nominal_horizon=args.nominal_horizon,
             branch_horizon=args.branch_horizon,
             window_length=args.window_length,
+            split_ratios=(
+                {"train": 0.0, "valid": 0.0, "test": 1.0}
+                if args.all_test else Phase1Config().split_ratios
+            ),
             save_videos=not args.no_videos,
             verify_videos=not args.skip_video_verification,
         )

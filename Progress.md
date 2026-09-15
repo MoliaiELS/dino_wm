@@ -153,6 +153,19 @@ Make a representation claim only if the learned temporal representation improves
 
 Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is tracked below.
 
+### 2026-09-15 11:24 - Phase 2 validation planner selection locked
+
+- Phase/purpose: select one planner configuration on validation data before generating an untouched confirmatory set
+- Git commit: planner implementation `edf424f`; evaluation-only dataset mode is in the following implementation commit
+- Command/config: P0 current short planner; P1 adds train-support norm cap/no-op; P2 adds two independent control blocks; P3 adds two control blocks plus trajectory, progress-regression and near-goal object-speed costs. P1 and P3 were expanded to all three training seeds; the selection score used absolute performance pooled across SFN and SFR, not the treatment-control delta.
+- Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v2`, validation split only
+- Seeds: training seeds 0/1/2
+- SLURM job ID/node: P0 `16250/16251`; P1 seed 0 `16252/16253`, seed 1 `16260/16261`, seed 2 `16264/16265`; P2 seed 0 `16255/16256`; P3 seed 0 `16258/16259`, seed 1 `16262/16263`, seed 2 `16266/16267`; all completed on `4090node1` with exit code 0
+- Log/output path: `$DATASET_DIR/logs/v2-*-p{0,1,2,3}*-<job>.out`; per-run JSON under `$DATASET_DIR/phase2_runs/attribution_v2_65b750f/<variant>/seed_<n>/validation_p*.json`; aggregates `validation_p1_aggregate.json` and `validation_p3_aggregate.json`
+- Status: completed; P3 locked
+- Key metrics/error: P3 pooled across both variants has success 0.072 versus P1 0.017, final coverage 0.403 versus 0.334, retention loss 0.162 versus 0.200 and action cost 13.23 versus 15.35. Under P3, SFN/SFR validation success is 2/90 versus 11/90; final coverage 0.397 versus 0.409, paired delta +0.012 [-0.102, 0.131]; maximum coverage 0.481 versus 0.648, delta +0.167 [0.039, 0.298]; action cost 14.66 versus 11.80, delta -2.86 [-4.44, -1.27]. Success delta +0.100 still has CI [-0.022, 0.233].
+- Decision/next action: lock P3 exactly as horizon 4/repeat 2, norm cap 0.5, initial std 0.25, action/smoothness/staging weights 0.02/0.01/1.0, trajectory/progress/object-speed weights 0.5/1.0/0.5 and minimum predicted improvement 0.005. Do not tune further; generate 60 new all-test scenarios with 10 per perturbation cell and evaluate all six checkpoints.
+
 ### 2026-09-15 11:05 - Phase 2 validation-only planner repair implementation
 
 - Phase/purpose: remove the observed planner/data-distribution mismatch without retraining or touching the test split for model selection
