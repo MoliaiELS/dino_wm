@@ -151,11 +151,11 @@ Phase 0 used short login-node CPU smoke tests only. Phase 1 batch generation is 
 - Command/config: 200 scenarios, 224-pixel RGB, 50-step S, equal 35-step N/F1/F2/R branches, 21-state windows, videos and full audit enabled
 - Dataset path/version: `$DATASET_DIR/pusht_recovery_phase1_pilot_v2` (`pusht-recovery-pairs-v2`)
 - Seeds: data seed 20260914
-- SLURM job ID/node: `16212`, running on `4090node3`
+- SLURM job ID/node: `16212`, completed on `4090node3` with exit code `0` in 3m23s
 - Log/output path: `$DATASET_DIR/logs/p1-v2-data-16212.out`
-- Status: running
-- Key metrics/error: job started successfully after removing an incompatible explicit 8 GB memory request; first six scenarios completed with S/R success and F1 failure as expected
-- Decision/next action: wait for generation and audit completion; do not start SFN/SFR training until Gate A and R-versus-N distinctiveness are checked on all 200 pairs
+- Status: completed
+- Key metrics/error: dataset size 26 MB; Gate A passed with zero errors/warnings, zero counterfactual branch error, zero N-to-S snapshot error, zero action violations and zero alignment violations. S/N/R success rates are 1.0 and F1/F2 are 0.0. SFN and SFR each contain 400 success / 200 failure trajectories and identical 8,820/1,890/1,890 train/valid/test windows. Across 200 pairs, R versus N action RMSE is 0.104 command units, agent-object RMSE 11.04 px, object-goal RMSE 12.75 px, and recovery prefix averages 6.685 of 35 steps (19.1%, range 4–9).
+- Decision/next action: full v2 attribution dataset is structurally valid and R is measurably off nominal, though the prefix remains short for retreat cases. Start exactly one matched training seed for SFN versus SFR with shared D_SF normalization; inspect offline failure-state evidence before closed-loop or more seeds.
 
 ### 2026-09-15 09:40 - Phase 1/2 recovery-specific attribution v2 implementation and smoke
 
